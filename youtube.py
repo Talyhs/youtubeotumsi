@@ -29,7 +29,7 @@ def generate_script(topic: str) -> str:
     )
     
     response = client.models.generate_content(
-        model='gemini-1.5-pro',
+        model='gemini-1.5-flash',
         contents=prompt,
     )
     
