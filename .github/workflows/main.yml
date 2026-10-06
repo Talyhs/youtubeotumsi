@@ -20,4 +20,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CLIENT_SECRETS_FILE: client_secrets.json
           TOKEN_FILE: token.json
-        run: python youtube_auto_pipeline.py
+        run: python youtube.py
