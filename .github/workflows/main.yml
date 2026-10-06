@@ -1,0 +1,23 @@
+name: YouTube Automation
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLIENT_SECRETS_FILE: client_secrets.json
+          TOKEN_FILE: token.json
+        run: python youtube_auto_pipeline.py
