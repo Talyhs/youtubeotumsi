@@ -1,6 +1,6 @@
 google-genai
 gTTS
-moviepy
+moviepy==1.0.3
 Pillow
 google-api-python-client
 google-auth-oauthlib
