@@ -13,7 +13,7 @@ TOPIC = "Kosmos haqqında 3 maraqlı fakt"
 BACKGROUND_IMAGE_PATH = "background.jpg"
 OUTPUT_VIDEO_PATH = "youtube_short.mp4"
 
-from tenacity import retry, stop\_after\_attempt, wait\_fixed\
+from tenacity import retry, stop\_after\_attempt, wait_fixed
 # ---------------------------------------------------------
 @retry
 
