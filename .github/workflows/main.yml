@@ -1,33 +1,104 @@
 name: YouTube Automation
 
 on:
+  # Every day at 18:00 UTC
   schedule:
-    - cron: '0 18 * * *'
+    - cron: "0 18 * * *"
+
+  # Allows manual execution from GitHub Actions
   workflow_dispatch:
 
 jobs:
   run-pipeline:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+
+      # ==========================================
+      # 1. Download repository
+      # ==========================================
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-     - name: Install dependencies
-  run: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
+
+      # ==========================================
+      # 2. Install Python
+      # ==========================================
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
 
 
-      - name: Run script
+      # ==========================================
+      # 3. Install system dependencies
+      # ==========================================
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            ffmpeg \
+            imagemagick
+
+
+      # ==========================================
+      # 4. Install Python dependencies
+      # ==========================================
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+
+      # ==========================================
+      # 5. Create Google OAuth files
+      # ==========================================
+      - name: Create Google OAuth files
+        env:
+          CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        run: |
+
+          echo "$CLIENT_SECRETS_JSON" > client_secrets.json
+          echo "$TOKEN_JSON" > token.json
+
+          echo "Google OAuth files created."
+
+
+      # ==========================================
+      # 6. Run YouTube automation
+      # ==========================================
+      - name: Run YouTube automation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CLIENT_SECRETS_FILE: client_secrets.json
-          TOKEN_FILE: token.json
-        run: python youtube.py
+        run: |
+          python youtube.py
 
-      - name: Upload Video Artifact
+
+      # ==========================================
+      # 7. Upload generated video as artifact
+      # ==========================================
+      - name: Upload generated video
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: youtube-video
           path: youtube_short.mp4
+          if-no-files-found: warn
+          retention-days: 7
+
+
+      # ==========================================
+      # 8. Upload voice file as artifact
+      # ==========================================
+      - name: Upload voiceover
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiceover
+          path: voiceover.mp3
+          if-no-files-found: warn
+          retention-days: 7
