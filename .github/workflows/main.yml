@@ -21,3 +21,18 @@ jobs:
           CLIENT_SECRETS_FILE: client_secrets.json
           TOKEN_FILE: token.json
         run: python youtube.py
+        yaml
+
+- name: Upload Video
+
+Artifact
+
+uses: actions/upload -artifact@v4
+
+with:
+
+name: youtube-video
+
+path:
+
+youtube_short.mp4
