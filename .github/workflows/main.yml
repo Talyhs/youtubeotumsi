@@ -1,38 +1,35 @@
 name: YouTube Automation
+
 on:
   schedule:
     - cron: '0 18 * * *'
   workflow_dispatch:
+
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
+
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Run script
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CLIENT_SECRETS_FILE: client_secrets.json
           TOKEN_FILE: token.json
         run: python youtube.py
-      
 
-- name: Upload Video
-
-Artifact
-
-uses: actions/upload -artifact@v4
-
-with:
-
-name: youtube-video
-
-path:
-
-youtube_short.mp4
+      - name: Upload Video Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-video
+          path: youtube_short.mp4
