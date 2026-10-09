@@ -383,7 +383,7 @@ def create_voice_and_subtitles(script):
     # American English Kokoro voice; audio is generated locally by the model.
     pipeline = KPipeline(lang_code="a")
     audio_chunks = []
-    for _, graphemes, _, audio in pipeline(
+    for graphemes, phonemes, audio in pipeline(
         script,
         voice=VOICE,
         speed=1.0,
