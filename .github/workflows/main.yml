@@ -1,8 +1,9 @@
-name: YouTube Automation
+name: Daily Azerbaijani Facts Video
 
 on:
   schedule:
-    - cron: "0 18 * * *"
+    - cron: "0 9 * * *"
+      timezone: "Asia/Baku"
   workflow_dispatch:
 
 permissions:
@@ -89,7 +90,6 @@ jobs:
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
           GEMINI_TEXT_MODEL: gemini-3.8-flash
-          VIDEO_TOPIC: Azərbaycanda insanlar ən çox nəyə pul xərcləyir?
           EDGE_TTS_VOICE: az-AZ-BabekNeural
           YOUTUBE_PRIVACY_STATUS: public
           PYTHONUNBUFFERED: "1"
