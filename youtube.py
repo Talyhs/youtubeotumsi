@@ -4,6 +4,8 @@ import os
 import re
 import subprocess
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -29,7 +31,7 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
-TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "3 Amazing Facts About Space"
+TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "10 maraqlı fakt"
 VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or "az-AZ-BabekNeural"
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
@@ -42,6 +44,48 @@ SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 YOUTUBE_CATEGORY = "27"
 HEADERS = {"User-Agent": "TalyhsYouTubeAutomation/1.0"}
 TIMEOUT = 60
+
+# Daily topic rotation in Azerbaijan time; topics cycle only after 30 days.
+DAILY_TOPICS = [
+    ("Kosmos və planetlər haqqında", ["space planets galaxy", "astronaut outer space", "solar system stars"]),
+    ("Okean və dənizlər haqqında", ["deep ocean sea life", "underwater coral reef", "ocean waves marine animals"]),
+    ("İnsan bədəni haqqında", ["human body science", "human brain medical animation", "heart anatomy educational"]),
+    ("Heyvanlar aləmi haqqında", ["wild animals nature", "animal behavior wildlife", "birds mammals nature"]),
+    ("Dünya və təbiət möcüzələri haqqında", ["natural wonders landscape", "waterfalls mountains nature", "volcano forest nature"]),
+    ("Tarixdən maraqlı hadisələr haqqında", ["ancient civilization ruins", "historical artifacts museum", "ancient architecture"]),
+    ("Elm və fizika haqqında", ["science laboratory experiment", "physics experiment education", "scientist laboratory"]),
+    ("Texnologiya və süni intellekt haqqında", ["artificial intelligence technology", "robotics computer technology", "futuristic technology"]),
+    ("Qədim sivilizasiyalar haqqında", ["ancient civilization pyramids", "archaeology excavation", "ancient ruins"]),
+    ("Qida və gündəlik həyat haqqında", ["food science kitchen", "fresh food market", "cooking ingredients closeup"]),
+    ("Yuxu və beyin haqqında", ["sleeping person night", "brain neuroscience animation", "dream sleep science"]),
+    ("Dünyanın ən qəribə yerləri haqqında", ["unusual places on earth", "strange landscapes travel", "remote island aerial"]),
+    ("İxtiralar və kəşflər haqqında", ["scientific inventions workshop", "inventions museum", "engineering innovation"]),
+    ("Riyaziyyat və rəqəmlər haqqında", ["mathematics numbers classroom", "geometry equations writing", "numbers data visualization"]),
+    ("Bitkilər və meşələr haqqında", ["forest plants closeup", "tropical rainforest wildlife", "flowers growing time lapse"]),
+    ("Hava və iqlim haqqında", ["weather clouds storm", "lightning thunderstorm", "climate nature landscape"]),
+    ("İnsan psixologiyası haqqında", ["people thinking psychology", "human behavior crowd", "person reflecting window"]),
+    ("Gündəlik əşyaların sirri haqqında", ["everyday objects close up", "household items macro", "manufacturing everyday products"]),
+    ("Dünya rekordları haqqında", ["world record sports action", "extreme nature records", "largest structures aerial"]),
+    ("Məşhur alimlər və kəşflər haqqında", ["scientist working laboratory", "science history books", "research microscope laboratory"]),
+    ("Günəş və ulduzlar haqqında", ["sun solar flare space", "stars night sky", "telescope astronomy observatory"]),
+    ("Quşlar haqqında", ["birds flying wildlife", "eagle in flight nature", "colorful birds close up"]),
+    ("Həşəratlar haqqında", ["insects macro photography", "bees pollinating flowers", "butterfly macro nature"]),
+    ("İnsan duyğuları haqqında", ["human facial expressions", "people emotions portrait", "person smiling thoughtful"]),
+    ("Nəqliyyat və maşınlar haqqında", ["modern transport cars trains", "airplane flying sky", "electric vehicle technology"]),
+    ("Yer kürəsinin geologiyası haqqında", ["rock formations geology", "volcano lava eruption", "mountain geology landscape"]),
+    ("Dünya mədəniyyətləri haqqında", ["world cultures traditional art", "traditional architecture travel", "cultural festival people"]),
+    ("Dəniz canlıları haqqında", ["marine animals underwater", "dolphins swimming ocean", "sea turtles coral reef"]),
+    ("İşıq və optika haqqında", ["light prism rainbow experiment", "optics science experiment", "laser light laboratory"]),
+    ("Gündəlik elmi faktlar haqqında", ["everyday science experiment", "science facts demonstration", "macro objects scientific"]),
+]
+
+def get_daily_topic():
+    """Pick a repeatable topic by day in Azerbaijan time."""
+    today = datetime.now(ZoneInfo("Asia/Baku")).date()
+    index = (today.timetuple().tm_yday - 1) % len(DAILY_TOPICS)
+    topic, queries = DAILY_TOPICS[index]
+    print(f"Daily Azerbaijani topic ({today.isoformat()}): {topic}")
+    return topic, queries
 
 
 def run(command):
@@ -173,41 +217,22 @@ def generate_text(prompt):
     ) from last_error
 
 def generate_script(topic):
-    print("1. Azərbaycan dilində video ssenarisi hazırlanır...")
-
-    normalized_topic = topic.casefold()
-    if "pul xərcləyir" in normalized_topic and "azərbaycan" in normalized_topic:
-        script = (
-            "Azərbaycanda insanlar ən çox nəyə pul xərcləyir? Rəsmi statistikaya "
-            "görə, ailə büdcəsində ən böyük pay ərzağa gedir. 2023-cü ildə "
-            "ev təsərrüfatlarının istehlak xərclərinin 44,4 faizi qida məhsullarına "
-            "sərf olunub. Su, işıq, qaz və digər yanacaq xərcləri 7,9 faiz, ev "
-            "əşyaları və məişət texnikası isə 7,7 faiz təşkil edib. Restoran, kafe "
-            "və mehmanxana xərclərinin payı 6,8 faiz, nəqliyyat xərclərinin payı "
-            "isə 6,6 faiz olub. Vacib məqam budur: bu rəqəmlər insanların bütün "
-            "gəlirlərini deyil, yalnız istehlak xərclərinin bölgüsünü göstərir. "
-            "Məlumatlar Azərbaycan Dövlət Statistika Komitəsinin 2023-cü il "
-            "statistikasına əsaslanır. Bəs siz ən çox nəyə pul xərcləyirsiniz? "
-            "Şərhlərdə yazın və belə məlumatlar üçün kanala abunə olun!"
-        )
-        print("Topic-specific script used; no Gemini request needed.")
-        print(script)
-        return script
+    print("1. Azərbaycan dilində 10 maraqlı fakt hazırlanır...")
 
     prompt = f"""
-Azərbaycan dilində YouTube Shorts üçün orijinal, təbii səslənən danışıq mətni yaz.
+Azərbaycan dilində YouTube videosu üçün təbii səslənən ssenari yaz.
 Mövzu: {topic}
 
 Tələblər:
-- Təxminən 100-140 Azərbaycan sözü.
-- İlk cümlə izləyicinin diqqətini cəlb etsin.
-- Səlis, düzgün Azərbaycan dilindən istifadə et.
-- Mövzu Azərbaycanda ev təsərrüfatlarının xərcləridirsə, 2023-cü ilin rəsmi statistikasını əsas götür: istehlak xərclərinin 44,4%-i ərzaq, 7,9%-i su/işıq/qaz və digər yanacaq, 7,7%-i ev əşyaları və məişət texnikası, 6,8%-i restoran/kafe/mehmanxana, 6,6%-i nəqliyyat xərcləridir.
-- Bu faizlərin ümumi gəlirin deyil, istehlak xərclərinin payı olduğunu düzgün izah et.
-- Rəqəmləri başqa il üçün aktual kimi təqdim etmə.
-- Rəsmi mənbə kimi Azərbaycan Dövlət Statistika Komitəsini qeyd et.
-- Sonda izləyiciyə sual ver və abunə olmağa qısa çağırış et.
-- Başlıq, markdown və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
+- Dəqiq 10 fərqli və həqiqətə uyğun maraqlı fakt təqdim et.
+- Təxminən 350-500 söz olsun; hər fakt qısa, aydın və informativ olsun.
+- Azərbaycan dilinin orfoqrafiyasına və təbii danışıq üslubuna riayət et.
+- İlk cümlə güclü maraq oyatsın.
+- Faktları "Birinci fakt", "İkinci fakt" kimi səsləndirməyə uyğun ardıcıllıqla ver.
+- Məşhur, yoxlanıla bilən faktlardan istifadə et; şübhəli statistika, uydurma sitat və dəqiqliyi bilinməyən rəqəmlər əlavə etmə.
+- Eyni faktı təkrarlama və clickbait yalanlarından istifadə etmə.
+- Sonunda mövzuya uyğun qısa sual və abunə çağırışı əlavə et.
+- Başlıq, markdown, URL və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
 """
     script = generate_text(prompt)
     print(script)
@@ -215,35 +240,43 @@ Tələblər:
 
 
 def generate_metadata(script):
-    """Create Azerbaijani SEO metadata locally without another Gemini request."""
+    """Build SEO title, description, tags and include the full spoken script."""
     print("2. Azərbaycan dilində SEO başlığı, açıqlama və etiketlər hazırlanır...")
 
-    title = "Azərbaycanda İnsanlar Ən Çox Nəyə Pul Xərcləyir? | Statistika"
+    topic = TOPIC.strip() or "maraqlı faktlar"
+    title = f"10 Maraqlı Fakt: {topic}"[:100].rstrip(" -,:;|")
+    topic_words = re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())
+    topic_words = [word for word in topic_words if word not in {
+        "haqqında", "barədə", "və", "olan", "üçün"
+    }]
+    keywords = list(dict.fromkeys(topic_words + [
+        "10 maraqlı fakt", "maraqlı məlumatlar", "Azərbaycan dilində",
+        "elm", "öyrən", "faktlar"
+    ]))
+    tags = keywords[:15]
+
+    hashtags = ["#MaraqlıFaktlar", "#Azərbaycan", "#Elm"]
+    if topic_words:
+        topic_hashtag = "#" + "".join(
+            word[:1].upper() + word[1:] for word in topic_words[:2]
+        )
+        if topic_hashtag not in hashtags:
+            hashtags.insert(0, topic_hashtag)
+    hashtags = hashtags[:4]
+
     description = (
-        "Azərbaycanda insanlar ən çox nəyə pul xərcləyir? Bu videoda "
-        "ərzaq, kommunal xidmətlər, ev əşyaları, restoranlar və nəqliyyat "
-        "üzrə ev təsərrüfatlarının istehlak xərclərinə baxırıq. "
-        "Videoda göstərilən faizlər Azərbaycan Dövlət Statistika Komitəsinin "
-        "2023-cü il üzrə istehlak xərclərinin strukturuna dair məlumatlarına əsaslanır. "
-        "Bu göstəricilər ümumi gəlirin deyil, istehlak xərclərinin payını göstərir.\n\n"
-        "Rəsmi mənbə: https://www.stat.gov.az/menu/6/statistical_yearbooks/source/stat-yearbook_2024.pdf\n\n"
-        "Siz ən çox nəyə pul xərcləyirsiniz? Şərhlərdə yazın və yeni videolar üçün abunə olun!"
+        f"{topic.capitalize()} mövzusunda 10 maraqlı fakt! "
+        f"Bu videoda {', '.join(topic_words[:4]) if topic_words else 'maraqlı mövzular'} "
+        "haqqında qısa, maarifləndirici məlumatlar öyrənəcəksiniz. "
+        "Yeni faktlar və biliklər üçün videonu sonadək izləyin, fikrinizi şərhdə yazın "
+        "və kanala abunə olun.\n\n"
+        "VİDEODA SƏSLƏNƏN MƏTN:\n"
+        + script.strip()
+        + "\n\n"
+        + " ".join(hashtags)
     )
-    tags = [
-        "Azərbaycanda xərclər", "insanlar nəyə pul xərcləyir",
-        "ailə büdcəsi", "ərzaq xərcləri", "kommunal xərclər",
-        "Azərbaycan statistikası", "pul idarəetməsi", "qənaət",
-        "istehlak xərcləri", "maliyyə savadlılığı", "Azərbaycan",
-        "maraqlı faktlar", "YouTube Shorts"
-    ]
-    # English phrases improve the chance of finding relevant stock footage.
-    queries = [
-        "grocery shopping supermarket food",
-        "paying household utility bills home",
-        "family budget shopping transportation"
-    ]
-    print("Azerbaijani SEO metadata generated locally; no extra Gemini request used.")
-    return title[:100], description, tags[:15], queries
+    print("SEO metadata and full narration text generated locally.")
+    return title, description[:4900], tags, []
 
 def search_pexels(query):
     response = requests.get(
@@ -688,13 +721,16 @@ def main():
     print("========================================")
     print(" TALYHS / YOUTUBE AUTOMATION")
     print("========================================")
+    global TOPIC
+    TOPIC, stock_queries = get_daily_topic()
     print("Topic:", TOPIC)
     print("Gemini model:", MODEL)
     print("TTS voice:", VOICE)
 
     check_configuration()
     script = generate_script(TOPIC)
-    title, description, tags, queries = generate_metadata(script)
+    title, description, tags, metadata_queries = generate_metadata(script)
+    queries = stock_queries or metadata_queries
     clips = collect_clips(queries, wanted=5)
     duration = create_voice_and_subtitles(script)
     make_video(clips, duration)
