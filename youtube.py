@@ -399,8 +399,6 @@ def create_voice_and_subtitles(script):
 
     if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
         raise RuntimeError("Edge-TTS did not create an audio file.")
-    if not boundaries:
-        raise RuntimeError("Edge-TTS returned no word timing data.")
 
     def stamp(seconds):
         ms = max(0, int(seconds * 1000))
@@ -409,7 +407,32 @@ def create_voice_and_subtitles(script):
         seconds, ms = divmod(ms, 1000)
         return f"{hours:02}:{minutes:02}:{seconds:02},{ms:03}"
 
-    # Group words into short readable captions using actual speech timings.
+    # Some Edge-TTS responses contain audio but omit WordBoundary events.
+    # In that case, estimate word timings across the real audio duration so the
+    # pipeline can still produce readable, approximately synchronized captions.
+    if not boundaries:
+        words = re.findall(r"\\S+", script)
+        if not words:
+            raise RuntimeError("The generated script contains no words.")
+        audio_duration = get_audio_duration()
+        weights = [
+            max(1, len(word)) + (0.45 if word.endswith((".", "!", "?")) else
+                                 0.2 if word.endswith((",", ";", ":")) else 0)
+            for word in words
+        ]
+        total_weight = sum(weights)
+        cursor = 0.0
+        for word, weight in zip(words, weights):
+            word_duration = audio_duration * weight / total_weight
+            boundaries.append({
+                "start": cursor,
+                "duration": word_duration,
+                "text": word,
+            })
+            cursor += word_duration
+        print("Warning: Edge-TTS supplied no word boundaries; using estimated subtitle timings.")
+
+    # Group words into short readable captions using available speech timings.
     groups = []
     current = []
 
