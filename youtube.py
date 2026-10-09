@@ -1,8 +1,8 @@
 
 import os
 import textwrap
+import time
 from pathlib import Path
-
 from google import genai
 from google.genai import types
 from gtts import gTTS
