@@ -104,10 +104,10 @@ Requirements:
 - Return only the spoken script.
 """
 
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=prompt
-    )
+ response = client.models.generate_content(
+    model=gemini-2.5-flash,
+    contents=prompt
+)
 
     script = (response.text or "").strip()
 
