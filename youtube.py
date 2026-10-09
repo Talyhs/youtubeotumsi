@@ -411,7 +411,7 @@ def create_voice_and_subtitles(script):
     # In that case, estimate word timings across the real audio duration so the
     # pipeline can still produce readable, approximately synchronized captions.
     if not boundaries:
-        words = re.findall(r"\\S+", script)
+        words = re.findall(r"\S+", script)
         if not words:
             raise RuntimeError("The generated script contains no words.")
         audio_duration = get_audio_duration()
