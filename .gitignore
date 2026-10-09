@@ -1,0 +1,18 @@
+
+# Google OAuth secrets
+token.json
+client_secrets.json
+
+# API keys and environment files
+.env
+.env.*
+
+# Generated video and audio files
+voiceover.mp3
+youtube_short.mp4
+background.png
+background_video.jpg
+
+# Python cache
+__pycache__/
+*.py[cod]
