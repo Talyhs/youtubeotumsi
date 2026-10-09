@@ -104,10 +104,15 @@ Requirements:
 - Return only the spoken script.
 """
 
- response = client.models.generate_content(
-    model=gemini-2.5-flash,
-    contents=prompt
-)
+def generate_script(topic):
+    prompt = f"Write an engaging English YouTube script about {topic}."
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+
+    return response.text
 
     script = (response.text or "").strip()
 
