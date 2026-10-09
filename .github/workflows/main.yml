@@ -89,8 +89,8 @@ jobs:
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
           GEMINI_TEXT_MODEL: gemini-3.8-flash
-          VIDEO_TOPIC: 3 Amazing Facts About Space
-          KOKORO_VOICE: af_heart
+          VIDEO_TOPIC: Azərbaycanda insanlar ən çox nəyə pul xərcləyir?
+          EDGE_TTS_VOICE: az-AZ-BabekNeural
           YOUTUBE_PRIVACY_STATUS: public
           PYTHONUNBUFFERED: "1"
         run: python youtube.py
@@ -111,6 +111,6 @@ jobs:
           name: youtube-production-files
           path: |
             work/subtitles.srt
-            work/voiceover.wav
+            work/voiceover.mp3
           if-no-files-found: ignore
           retention-days: 7
