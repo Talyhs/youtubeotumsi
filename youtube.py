@@ -6,7 +6,8 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 from gtts import gTTS
-from PIL import Image
+from PIL import Image, ImageDraw
+import random
 
 from moviepy.editor import (
     AudioFileClip,
@@ -285,76 +286,133 @@ def create_voice(script):
 # GENERATE TOPIC-SPECIFIC AI BACKGROUND
 # =========================================================
 
+
 def generate_background_image(script, title, image_idea):
+    """Generate an AI background, with a local fallback if unavailable."""
+
     print("4. Generating AI background image...")
 
     client = get_gemini_client()
-
-    model = (
-        os.environ.get("GEMINI_IMAGE_MODEL")
-        or "gemini-2.5-flash-image"
-    ).strip() or "gemini-2.5-flash-image"
-
-    print("Using Gemini image model:", model)
+    model = IMAGE_MODEL
 
     prompt = f"""
-Generate an actual image for a vertical YouTube Shorts video.
+Generate a cinematic vertical 9:16 background image for YouTube Shorts.
 
-TITLE:
-{title}
+TITLE: {title}
+SCRIPT: {script}
+VISUAL CONCEPT: {image_idea}
 
-SCRIPT:
-{script}
-
-VISUAL CONCEPT:
-{image_idea}
-
-Image requirements:
+Requirements:
 - Portrait 9:16 composition.
-- Match the topic and script accurately.
-- Strong central subject and cinematic lighting.
-- High visual quality and clear details.
-- Leave some uncluttered space for subtitles.
-- No text, letters, captions, logos or watermarks.
-- Return an image, not a written description.
+- Visually match the topic.
+- Cinematic lighting and high detail.
+- No text, letters, logos or watermarks.
+- Return an actual image.
 """
 
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_modalities=["IMAGE"],
-            image_config=types.ImageConfig(
-                aspect_ratio="9:16",
-                image_size="1K",
+    try:
+        print("Using Gemini image model:", model)
+
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(
+                    aspect_ratio="9:16",
+                    image_size="1K",
+                ),
             ),
-        ),
+        )
+
+        for part in (response.parts or []):
+            if getattr(part, "inline_data", None) is None:
+                continue
+
+            image = part.as_image()
+            if image is not None:
+                image.save(str(BACKGROUND_IMAGE))
+                print("AI background saved:", BACKGROUND_IMAGE.name)
+                return str(BACKGROUND_IMAGE)
+
+        print("Gemini returned no image. Using local fallback.")
+
+    except Exception as exc:
+        print("Gemini image generation failed:", str(exc))
+        print("Creating a local space background instead.")
+
+    # Local fallback: create a vertical space scene with PIL.
+    width, height = 1080, 1920
+    image = Image.new("RGB", (width, height))
+    pixels = image.load()
+
+    # Dark blue-to-purple vertical gradient.
+    for y in range(height):
+        t = y / height
+        r = int(8 + 23 * t)
+        g = int(10 + 8 * t)
+        b = int(38 + 48 * t)
+
+        for x in range(width):
+            pixels[x, y] = (r, g, b)
+
+    draw = ImageDraw.Draw(image)
+
+    # Star field.
+    random.seed(42)
+    for _ in range(260):
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        radius = random.choice([1, 1, 2, 3])
+        brightness = random.randint(150, 255)
+
+        draw.ellipse(
+            (x - radius, y - radius, x + radius, y + radius),
+            fill=(brightness, brightness, 255),
+        )
+
+    # Large reddish planet.
+    px, py, radius = 570, 850, 290
+
+    draw.ellipse(
+        (px - radius, py - radius, px + radius, py + radius),
+        fill=(174, 66, 47),
     )
 
-    for part in (response.parts or []):
-        if getattr(part, "inline_data", None) is None:
-            continue
+    # Planetary bands for a more textured appearance.
+    for i in range(9):
+        y = py - radius + 45 + i * 48
+        x_offset = int(40 * (i % 3))
+        draw.arc(
+            (
+                px - radius + x_offset,
+                y - 35,
+                px + radius - x_offset,
+                y + 70,
+            ),
+            start=10,
+            end=170,
+            fill=(205, 105, 72),
+            width=5,
+        )
 
-        image = part.as_image()
-
-        if image is None:
-            continue
-
-        image.save(str(BACKGROUND_IMAGE))
-
-        # Verify that the output is a valid image.
-        with Image.open(BACKGROUND_IMAGE) as check:
-            check.verify()
-
-        print("AI background saved:", BACKGROUND_IMAGE.name)
-        return str(BACKGROUND_IMAGE)
-
-    raise RuntimeError(
-        "Gemini did not return an image. Check whether the image "
-        "model is available to your API key, and check API quota."
+    # Blue planetary horizon near the bottom.
+    draw.ellipse(
+        (-350, 1450, 1430, 2250),
+        fill=(24, 83, 145),
+    )
+    draw.arc(
+        (-350, 1390, 1430, 2180),
+        start=180,
+        end=360,
+        fill=(100, 190, 255),
+        width=10,
     )
 
+    image.save(str(BACKGROUND_IMAGE), format="PNG")
 
+    print("Fallback background saved:", BACKGROUND_IMAGE.name)
+    return str(BACKGROUND_IMAGE)
 # =========================================================
 # CREATE VERTICAL VIDEO
 # =========================================================
