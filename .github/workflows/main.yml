@@ -53,30 +53,12 @@ jobs:
           python - <<'PY'
           import json
           import os
-
 required = [
     "GEMINI_API_KEY",
+    "PEXELS_API_KEY",
+    "PIXABAY_API_KEY",
     "TOKEN_JSON",
 ]
-
-if not (
-    os.environ.get("PEXELS_API_KEY", "").strip()
-    or os.environ.get("PIXABAY_API_KEY", "").strip()
-):
-    raise SystemExit(
-        "Add at least one GitHub Secret: "
-        "PEXELS_API_KEY or PIXABAY_API_KEY"
-    )
-
-          missing = [
-              key for key in required
-              if not os.environ.get(key, "").strip()
-          ]
-
-          if missing:
-              raise SystemExit(
-                  "Missing GitHub Secrets: " + ", ".join(missing)
-              )
 
           try:
               token = json.loads(os.environ["TOKEN_JSON"])
