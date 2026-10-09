@@ -191,47 +191,40 @@ Return only the spoken script.
 
 
 def generate_metadata(script):
-    print("2. Generating metadata and stock-video search terms...")
-    prompt = f"""
-Create YouTube metadata for this English short video.
+    """
+    Build metadata locally so a second Gemini request cannot exhaust the
+    project's daily API quota. Keep this deterministic and safe for automation.
+    """
+    print("2. Generating metadata and stock-video search terms locally...")
 
-SCRIPT:
-{script}
+    clean_topic = re.sub(r"\\s+", " ", TOPIC).strip()
+    title = clean_topic[:67].rstrip(" -,:;") 
+    if not title:
+        title = "Interesting Facts You Should Know"
+    if not title.lower().endswith("#shorts") and len(title) <= 60:
+        title = f"{title} #Shorts"
 
-Return exactly five lines:
-TITLE: accurate engaging title, maximum 70 characters
-DESCRIPTION: two concise sentences
-TAGS: 8 comma-separated relevant keywords
-QUERY1: short English stock-video search query
-QUERY2: short English stock-video search query
+    # Derive useful search phrases from the configured topic without another
+    # paid/free-tier model call. Keep the phrases short for stock-video APIs.
+    topic_words = re.findall(r"[A-Za-z0-9]+", clean_topic.lower())
+    stop_words = {"the", "and", "for", "with", "about", "from", "that", "this"}
+    keywords = [word for word in topic_words if word not in stop_words]
+    if not keywords:
+        keywords = ["interesting", "facts"]
 
-Use plain text only. Do not add extra lines.
-Queries must describe visible footage, not abstract ideas.
-"""
-    result = generate_text(prompt)
-    fields = {}
+    query1 = " ".join(keywords[:5])[:70]
+    query2 = " ".join(keywords[:3] + ["space", "planet"])[:70]
+    queries = list(dict.fromkeys(q for q in (query1, query2, clean_topic) if q))
 
-    for line in result.splitlines():
-        key, sep, value = line.partition(":")
-        if sep:
-            fields[key.strip().upper()] = value.strip()
-
-    title = fields.get("TITLE", script[:65].strip())
-    description = fields.get(
-        "DESCRIPTION", "Discover more in this short educational video."
+    description = (
+        f"{clean_topic}. Watch these quick, fascinating facts and discover "
+        "something new. Subscribe for more educational YouTube Shorts."
     )
-    tags = [
-        t.strip()[:100]
-        for t in fields.get("TAGS", "education,facts,learning,shorts").split(",")
-        if t.strip()
-    ][:15]
+    tags = list(dict.fromkeys(
+        keywords[:8] + ["facts", "education", "science", "learning", "shorts"]
+    ))[:15]
 
-    queries = [
-        fields.get("QUERY1", TOPIC),
-        fields.get("QUERY2", TOPIC + " nature"),
-        TOPIC,
-    ]
-    queries = list(dict.fromkeys(q.strip() for q in queries if q.strip()))
+    print("Metadata generated locally; no additional Gemini request used.")
     return title[:100], description, tags, queries[:3]
 
 
