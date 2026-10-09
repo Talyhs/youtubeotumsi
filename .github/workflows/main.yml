@@ -88,7 +88,7 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
-          GEMINI_TEXT_MODEL: gemini-2.5-flash
+          GEMINI_TEXT_MODEL: gemini-3.8-flash
           VIDEO_TOPIC: 3 Amazing Facts About Space
           EDGE_TTS_VOICE: en-US-AriaNeural
           YOUTUBE_PRIVACY_STATUS: public
