@@ -28,8 +28,43 @@ SCENE_FILE = WORK / "scenes.txt"
 TOKEN_FILE = BASE / "token.json"
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
-PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
+
+def check_configuration():
+    missing = []
+
+    if not GEMINI_KEY:
+        missing.append("GEMINI_API_KEY")
+
+    if not (PEXELS_KEY or PIXABAY_KEY):
+        missing.append(
+            "PIXABAY_API_KEY or PEXELS_API_KEY "
+            "(at least one stock video API key is required)"
+        )
+
+    if not os.getenv("TOKEN_JSON", "").strip():
+        missing.append("TOKEN_JSON")
+
+    if missing:
+        raise RuntimeError(
+            "Missing required configuration: " + ", ".join(missing)
+        )
+
+    run(["ffmpeg", "-version"])
+    run(["ffprobe", "-version"])
+
+    try:
+        token = json.loads(os.environ["TOKEN_JSON"])
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("TOKEN_JSON is not valid JSON.") from exc
+
+    if not token.get("refresh_token"):
+        raise RuntimeError(
+            "TOKEN_JSON must contain a valid OAuth refresh_token."
+        )
+
+    print("Configuration validated.")
+    print("Pexels enabled:", bool(PEXELS_KEY))
+    print("Pixabay enabled:", bool(PIXABAY_KEY))
 
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip()
 TOPIC = os.getenv("VIDEO_TOPIC", "3 Amazing Facts About Space").strip()
@@ -288,47 +323,78 @@ def download_file(url, destination):
     ])
 
 
+
 def collect_clips(queries, wanted=5):
-    print("3. Searching Pexels and Pixabay...")
+    print("3. Searching available stock video providers...")
+
+    providers = []
+
+    if PEXELS_KEY:
+        providers.append(search_pexels)
+
+    if PIXABAY_KEY:
+        providers.append(search_pixabay)
+
+    if not providers:
+        raise RuntimeError(
+            "No stock video provider configured. "
+            "Add PEXELS_API_KEY or PIXABAY_API_KEY to GitHub Secrets."
+        )
+
     candidates = []
     seen = set()
 
     for query in queries:
-        for search in (search_pexels, search_pixabay):
+        for search in providers:
             try:
                 results = search(query)
-                print(f"{search.__name__}: {len(results)} results for {query!r}")
-            except Exception as exc:
-                print(f"Search failed ({search.__name__}): {exc}")
-                continue
+                print(
+                    f"{search.__name__}: "
+                    f"{len(results)} results for {query!r}"
+                )
 
-            for item in results:
-                key = (item["source"], item["id"] or item["url"])
-                if key not in seen:
-                    seen.add(key)
-                    candidates.append(item)
+                for item in results:
+                    key = (item["source"], item["id"] or item["url"])
+                    if key not in seen:
+                        seen.add(key)
+                        candidates.append(item)
+
+            except Exception as exc:
+                print(
+                    f"Provider {search.__name__} failed: {exc}. "
+                    "Trying the next provider."
+                )
+                continue
 
     if not candidates:
         raise RuntimeError(
-            "No stock videos found. Check API keys, quotas and network access."
+            "Neither configured provider returned usable videos. "
+            "Check API keys, quotas and network access."
         )
 
     selected = []
+
     for item in candidates:
         path = WORK / f"stock_{len(selected) + 1}.mp4"
+
         try:
             print("Downloading:", item["source"], item["page"])
             download_file(item["url"], path)
             item["file"] = path
             selected.append(item)
+
             if len(selected) >= wanted:
                 break
+
         except Exception as exc:
-            print("Skipping unusable stock video:", exc)
+            print("Download failed; trying another clip:", exc)
 
     if not selected:
-        raise RuntimeError("Search returned videos, but none could be downloaded.")
+        raise RuntimeError(
+            "Videos were found, but none could be downloaded."
+        )
 
+    print(f"Selected {len(selected)} stock video(s).")
     return selected
 
 
