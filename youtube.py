@@ -505,16 +505,31 @@ def create_voice_and_subtitles(script):
     target_duration = float(os.getenv("TARGET_VIDEO_SECONDS", "193"))
     original_duration = get_audio_duration()
     tempo = original_duration / target_duration
-    if not 0.80 <= tempo <= 1.25:
+    if not 0.25 <= tempo <= 4.0:
         raise RuntimeError(
             f"Səsləndirmə müddəti ({original_duration:.1f}s) 3:13 hədəfindən "
-            "çox fərqlənir. Ssenarini təxminən 390-430 söz saxlayın."
+            "həddindən artıq fərqlənir. Ssenarinin söz sayını və Edge TTS səsini yoxlayın."
         )
+
+    # FFmpeg atempo filters are chained so each factor stays within 0.5-2.0.
+    # This supports realistic narration speeds without unnecessarily rejecting
+    # scripts that naturally render a little faster or slower.
+    tempo_factors = []
+    remaining_tempo = tempo
+    while remaining_tempo < 0.5:
+        tempo_factors.append(0.5)
+        remaining_tempo /= 0.5
+    while remaining_tempo > 2.0:
+        tempo_factors.append(2.0)
+        remaining_tempo /= 2.0
+    tempo_factors.append(remaining_tempo)
+    tempo_filter = ",".join(f"atempo={factor:.6f}" for factor in tempo_factors)
+
     adjusted_audio = WORK / "voiceover_adjusted.mp3"
     run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-i", str(AUDIO_FILE),
-        "-filter:a", f"atempo={tempo:.6f}",
+        "-filter:a", tempo_filter,
         "-t", f"{target_duration:.3f}",
         "-codec:a", "libmp3lame", "-q:a", "3",
         str(adjusted_audio),
