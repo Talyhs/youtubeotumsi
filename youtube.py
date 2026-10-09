@@ -33,14 +33,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 # IMPORTANT: GitHub variables may exist but be empty.
 # "or" ensures that a default model is always selected.
 TEXT_MODEL = (
-    os.environ.get("GEMINI_TEXT_MODEL")
-    or "gemini-2.5-flash"
-).strip() or "gemini-2.5-flash"
+    os.environ.get("GEMINI_TEXT_MODEL", "").strip()
+    or "gemini-3.8-flash"
+)
 
 IMAGE_MODEL = (
-    os.environ.get("GEMINI_IMAGE_MODEL")
+    os.environ.get("GEMINI_IMAGE_MODEL", "").strip()
     or "gemini-2.5-flash-image"
-).strip() or "gemini-2.5-flash-image"
+)
 
 TOPIC = (
     os.environ.get("VIDEO_TOPIC")
