@@ -88,28 +88,65 @@ def get_gemini_client():
 
     return genai.Client(api_key=api_key)
     
+
 def generate_text(prompt):
-    """Generate text using the configured Gemini model."""
+    """Generate text with automatic retries for temporary API errors."""
 
     client = get_gemini_client()
     model = TEXT_MODEL
+    max_attempts = 5
 
     print(f"Using Gemini text model: {model}")
 
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-    )
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+            )
 
-    result = (response.text or "").strip()
+            result = (response.text or "").strip()
 
-    if not result:
-        raise RuntimeError(
-            "Gemini returned empty text. Check API access, "
-            "model availability, quota, and API response."
-        )
+            if not result:
+                raise RuntimeError(
+                    "Gemini returned an empty text response."
+                )
 
-    return result
+            return result
+
+        except Exception as exc:
+            status = (
+                getattr(exc, "status_code", None)
+                or getattr(exc, "code", None)
+            )
+
+            try:
+                status = int(status)
+            except (TypeError, ValueError):
+                status = None
+
+            retryable_statuses = {429, 500, 502, 503, 504}
+
+            if status not in retryable_statuses:
+                raise
+
+            if attempt == max_attempts:
+                raise RuntimeError(
+                    f"Gemini API failed after {max_attempts} attempts. "
+                    f"Last error: {exc}"
+                ) from exc
+
+            wait_seconds = min(2 ** attempt, 30)
+
+            print(
+                f"Temporary Gemini API error (HTTP {status}). "
+                f"Attempt {attempt}/{max_attempts} failed. "
+                f"Retrying in {wait_seconds} seconds..."
+            )
+
+            time.sleep(wait_seconds)
+
+    raise RuntimeError("Gemini text generation failed.")
 
 
 TEXT_MODEL = (
