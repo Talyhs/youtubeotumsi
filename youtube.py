@@ -99,32 +99,78 @@ def generate_text(prompt):
     client = genai.Client(api_key=GEMINI_KEY)
     last_error = None
 
-    for attempt in range(5):
-        try:
-            response = client.models.generate_content(
-                model=MODEL,
-                contents=prompt,
-            )
-            text = (response.text or "").strip()
-            if not text:
-                raise RuntimeError("Gemini returned an empty response.")
-            return text
-        except Exception as exc:
-            last_error = exc
-            message = str(exc).lower()
-            retryable = any(
-                item in message
-                for item in (
-                    "429", "500", "502", "503", "504",
-                    "resource exhausted", "temporarily unavailable",
+    fallback_models = [
+        item.strip()
+        for item in os.getenv(
+            "GEMINI_FALLBACK_MODELS",
+            "gemini-3.7-flash,gemini-3.5-flash-lite",
+        ).split(",")
+        if item.strip()
+    ]
+    models_to_try = list(dict.fromkeys([MODEL] + fallback_models))
+
+    for model_name in models_to_try:
+        print(f"Generating text with Gemini model: {model_name}")
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
                 )
-            )
-            if not retryable or attempt == 4:
+                result = (response.text or "").strip()
+                if not result:
+                    raise RuntimeError(
+                        f"Gemini model {model_name} returned an empty response."
+                    )
+                return result
+            except Exception as exc:
+                last_error = exc
+                message = str(exc).lower()
+                retryable = any(
+                    item in message
+                    for item in (
+                        "429", "500", "502", "503", "504",
+                        "resource exhausted", "temporarily unavailable",
+                        "high demand", "unavailable",
+                    )
+                )
+                model_unavailable = any(
+                    item in message
+                    for item in (
+                        "404", "not found", "no longer available",
+                        "unsupported model", "model is not supported",
+                    )
+                )
+
+                if model_unavailable:
+                    print(
+                        f"Gemini model {model_name} is unavailable; "
+                        "trying the next configured model."
+                    )
+                    break
+
+                if retryable:
+                    if attempt < 2:
+                        delay = (3, 8, 15)[attempt]
+                        print(
+                            f"Gemini {model_name} temporarily failed "
+                            f"(attempt {attempt + 1}/3): {exc}. "
+                            f"Retrying in {delay}s."
+                        )
+                        time.sleep(delay)
+                        continue
+                    print(
+                        f"Gemini {model_name} remained unavailable after "
+                        "3 attempts; trying the next model."
+                    )
+                    break
+
                 raise
-            time.sleep(min(2 ** (attempt + 1), 30))
 
-    raise RuntimeError("Gemini request failed.") from last_error
-
+    raise RuntimeError(
+        "All configured Gemini models failed. Last error: "
+        + str(last_error)
+    ) from last_error
 
 def generate_script(topic):
     print("1. Generating English script...")
