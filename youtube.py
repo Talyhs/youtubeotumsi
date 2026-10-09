@@ -238,16 +238,16 @@ Tələblər:
 - Başlıq, markdown, URL və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
 """
     script = generate_text(prompt)
-    word_count = len(re.findall(r"\\b[\\wƏəIıİiÖöÜüĞğŞşÇç]+\\b", script, flags=re.UNICODE))
+    word_count = len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
     if not 390 <= word_count <= 430:
         print(f"Generated script has {word_count} words; requesting one correction.")
         correction_prompt = (
             "Aşağıdakı Azərbaycan dilində ssenarini məzmununu və 10 faktını qoruyaraq "
             "390-430 söz aralığına düzəlt. İlk 5 saniyənin girişini və son çağırışı saxla. "
-            "Yalnız ssenarini qaytar, əlavə izah yazma.\\n\\n" + script
+            "Yalnız ssenarini qaytar, əlavə izah yazma.\n\n" + script
         )
         script = generate_text(correction_prompt)
-        word_count = len(re.findall(r"\\b[\\wƏəIıİiÖöÜüĞğŞşÇç]+\\b", script, flags=re.UNICODE))
+    word_count = len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
     if not 390 <= word_count <= 430:
         raise RuntimeError(
             f"Gemini ssenarisi {word_count} sözdür; tələb olunan aralıq 390-430 sözdür. "
