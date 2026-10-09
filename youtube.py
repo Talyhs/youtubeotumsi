@@ -33,7 +33,11 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 # IMPORTANT: GitHub variables may exist but be empty.
 # "or" ensures that a default model is always selected.
 
-model = TEXT_MODEL
+
+TEXT_MODEL = (
+    os.environ.get("GEMINI_TEXT_MODEL", "").strip()
+    or "gemini-3.8-flash"
+)
 
 IMAGE_MODEL = (
     os.environ.get("GEMINI_IMAGE_MODEL", "").strip()
@@ -90,10 +94,7 @@ def generate_text(prompt):
 
     client = get_gemini_client()
 
-    model = (
-        os.environ.get("GEMINI_TEXT_MODEL")
-        or "gemini-2.5-flash"
-    ).strip() or "gemini-2.5-flash"
+   model = TEXT_MODEL
 
     print(f"Using Gemini text model: {model}")
 
