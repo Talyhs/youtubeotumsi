@@ -22,15 +22,11 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # ==========================================
       # 1. Download repository
-      # ==========================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ==========================================
       # 2. Install Python
-      # ==========================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -38,38 +34,29 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      # ==========================================
       # 3. Install system dependencies
-      # ==========================================
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core
 
-      # ==========================================
-      # 4. Configure ImageMagick for MoviePy
-      # ==========================================
+      # 4. Configure ImageMagick
       - name: Configure ImageMagick
         run: |
           echo "ImageMagick version:"
           convert -version
-
           echo "Checking ImageMagick policy..."
           if [ -f /etc/ImageMagick-6/policy.xml ]; then
             grep -n "policy" /etc/ImageMagick-6/policy.xml || true
           fi
 
-      # ==========================================
       # 5. Install Python dependencies
-      # ==========================================
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ==========================================
       # 6. Validate required secrets
-      # ==========================================
       - name: Validate required secrets
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -77,24 +64,38 @@ jobs:
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
         run: |
           python - <<'PY'
+          import json
           import os
+
           required = [
               "GEMINI_API_KEY",
               "CLIENT_SECRETS_JSON",
               "TOKEN_JSON",
           ]
-          missing = [key for key in required if not os.getenv(key)]
+
+          missing = [
+              name for name in required
+              if not os.getenv(name, "").strip()
+          ]
+
           if missing:
               raise SystemExit(
                   "Missing GitHub Actions secrets: "
                   + ", ".join(missing)
               )
-          print("Required secrets are present.")
+
+          for name in ("CLIENT_SECRETS_JSON", "TOKEN_JSON"):
+              try:
+                  json.loads(os.environ[name])
+              except json.JSONDecodeError as exc:
+                  raise SystemExit(
+                      f"{name} is not valid JSON: {exc}"
+                  )
+
+          print("Required secrets exist and JSON is valid.")
           PY
 
-      # ==========================================
       # 7. Create Google OAuth files
-      # ==========================================
       - name: Create Google OAuth files
         env:
           CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
@@ -103,6 +104,7 @@ jobs:
           python - <<'PY'
           import json
           import os
+          from pathlib import Path
 
           files = {
               "client_secrets.json": "CLIENT_SECRETS_JSON",
@@ -111,51 +113,35 @@ jobs:
 
           for filename, env_name in files.items():
               content = os.environ[env_name]
-              with open(filename, "w", encoding="utf-8") as f:
-                  f.write(content)
-
-              with open(filename, encoding="utf-8") as f:
-                  json.load(f)
-
+              json.loads(content)
+              Path(filename).write_text(content, encoding="utf-8")
               print(f"{filename} created and validated.")
           PY
 
-
-      # ==========================================
       # 8. Run YouTube automation
-      # ==========================================
       - name: Run YouTube automation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-          # Default model names are used if repository variables are empty.
-         GEMINI_TEXT_MODEL: gemini-3.8-flash
-         GEMINI_IMAGE_MODEL: gemini-2.5-flash-image
-
-          # Optional video topic
+          GEMINI_TEXT_MODEL: gemini-3.8-flash
+          GEMINI_IMAGE_MODEL: gemini-2.5-flash-image
           VIDEO_TOPIC: ${{ vars.VIDEO_TOPIC }}
-
           PYTHONUNBUFFERED: "1"
         run: |
           python - <<'PY'
           import os
 
-          required = ["GEMINI_API_KEY"]
-          missing = [name for name in required if not os.getenv(name, "").strip()]
+          for name in ("GEMINI_API_KEY", "GEMINI_TEXT_MODEL", "GEMINI_IMAGE_MODEL"):
+              if not os.getenv(name, "").strip():
+                  raise SystemExit(f"Missing environment variable: {name}")
 
-          if missing:
-              raise SystemExit("Missing GitHub Actions secrets: " + ", ".join(missing))
-
-          print("Text model:", os.getenv("GEMINI_TEXT_MODEL"))
-          print("Image model:", os.getenv("GEMINI_IMAGE_MODEL"))
+          print("Text model:", os.environ["GEMINI_TEXT_MODEL"])
+          print("Image model:", os.environ["GEMINI_IMAGE_MODEL"])
           print("Starting YouTube automation...")
           PY
 
           python youtube.py
 
-      # ==========================================
-      # 9. Upload generated video as artifact
-      # ==========================================
+      # 9. Upload generated video
       - name: Upload generated video
         if: always()
         uses: actions/upload-artifact@v4
@@ -165,9 +151,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      # ==========================================
-      # 10. Upload generated AI background
-      # ==========================================
+      # 10. Upload AI background
       - name: Upload AI background
         if: always()
         uses: actions/upload-artifact@v4
@@ -179,9 +163,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # ==========================================
-      # 11. Upload generated voiceover
-      # ==========================================
+      # 11. Upload voiceover
       - name: Upload voiceover
         if: always()
         uses: actions/upload-artifact@v4
