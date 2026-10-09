@@ -23,7 +23,7 @@ WORK.mkdir(exist_ok=True)
 
 VIDEO_FILE = BASE / "youtube_short.mp4"
 AUDIO_FILE = WORK / "voiceover.mp3"
-SUBTITLE_FILE = WORK / "subtitles.srt"
+SUBTITLE_FILE = WORK / "subtitles.ass"
 SCENE_FILE = WORK / "scenes.txt"
 TOKEN_FILE = BASE / "token.json"
 
@@ -224,14 +224,17 @@ Azərbaycan dilində YouTube videosu üçün təbii səslənən ssenari yaz.
 Mövzu: {topic}
 
 Tələblər:
-- Dəqiq 10 fərqli və həqiqətə uyğun maraqlı fakt təqdim et.
-- Təxminən 350-500 söz olsun; hər fakt qısa, aydın və informativ olsun.
-- Azərbaycan dilinin orfoqrafiyasına və təbii danışıq üslubuna riayət et.
-- İlk cümlə güclü maraq oyatsın.
-- Faktları "Birinci fakt", "İkinci fakt" kimi səsləndirməyə uyğun ardıcıllıqla ver.
-- Məşhur, yoxlanıla bilən faktlardan istifadə et; şübhəli statistika, uydurma sitat və dəqiqliyi bilinməyən rəqəmlər əlavə etmə.
-- Eyni faktı təkrarlama və clickbait yalanlarından istifadə etmə.
-- Sonunda mövzuya uyğun qısa sual və abunə çağırışı əlavə et.
+- Dəqiq 10 fərqli və mümkün qədər etibarlı, həqiqətə uyğun fakt təqdim et.
+- Mətn 390-430 Azərbaycan sözü olsun; videonun hədəf müddəti 3 dəqiqə 13 saniyədir.
+- Təbii danışıq dili, qısa cümlələr və səsli oxunuş üçün rahat ritm istifadə et.
+- İlk 5 saniyədə güclü maraq oyadan sual və ya təəccüblü ziddiyyət yarat; cavabı dərhal açma.
+- Giriş 1-2 cümlə olsun, uzadılmış salamlaşma yazma.
+- Hər faktı "1-ci fakt", "2-ci fakt" formasında başlat; hər faktın ilk cümləsi maraq oyatsın.
+- Faktlar arasında qısa, təbii keçidlər və açıq suallar istifadə et ki, tamaşaçı növbəti faktı gözləsin.
+- 3-cü və 7-ci faktlardan əvvəl marağı artıran keçid ver, cavabı həmin faktın içində aç.
+- Faktlar qısa, konkret, bir-birindən fərqli olsun. Uydurma rəqəmlər, saxta sitatlar və sübut olunmamış iddialar yazma.
+- Təxminən hər 20-30 saniyədə yeni maraq elementi olsun; ritm sürətli qalsın.
+- Sonda ən maraqlı faktı xatırladan qısa sual və təbii abunə çağırışı ver.
 - Başlıq, markdown, URL və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
 """
     script = generate_text(prompt)
@@ -460,7 +463,7 @@ def collect_clips(queries, wanted=5):
 
 
 def create_voice_and_subtitles(script):
-    print("4. Edge TTS ilə Azərbaycan dilində səs və subtitrlər hazırlanır...")
+    print("4. Edge TTS ilə Azərbaycan dilində səs və diqqətçəkən subtitrlər hazırlanır...")
 
     import asyncio
     import edge_tts
@@ -469,7 +472,7 @@ def create_voice_and_subtitles(script):
         raise RuntimeError("Cannot synthesize an empty script.")
 
     async def synthesize():
-        communicate = edge_tts.Communicate(script, VOICE)
+        communicate = edge_tts.Communicate(script, VOICE, rate="+0%")
         await communicate.save(str(AUDIO_FILE))
 
     try:
@@ -482,24 +485,45 @@ def create_voice_and_subtitles(script):
     if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
         raise RuntimeError("Edge TTS did not create an audio file.")
 
-    def stamp(seconds):
-        ms = max(0, int(seconds * 1000))
-        hours, ms = divmod(ms, 3_600_000)
-        minutes, ms = divmod(ms, 60_000)
-        seconds, ms = divmod(ms, 1000)
-        return f"{hours:02}:{minutes:02}:{seconds:02},{ms:03}"
+    # Aim for 3:13. atempo adjusts playback speed without changing pitch.
+    target_duration = float(os.getenv("TARGET_VIDEO_SECONDS", "193"))
+    original_duration = get_audio_duration()
+    tempo = original_duration / target_duration
+    if not 0.80 <= tempo <= 1.25:
+        raise RuntimeError(
+            f"Səsləndirmə müddəti ({original_duration:.1f}s) 3:13 hədəfindən "
+            "çox fərqlənir. Ssenarini təxminən 390-430 söz saxlayın."
+        )
+    adjusted_audio = WORK / "voiceover_adjusted.mp3"
+    run([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", str(AUDIO_FILE),
+        "-filter:a", f"atempo={tempo:.6f}",
+        "-t", f"{target_duration:.3f}",
+        "-codec:a", "libmp3lame", "-q:a", "3",
+        str(adjusted_audio),
+    ])
+    adjusted_audio.replace(AUDIO_FILE)
+    audio_duration = get_audio_duration()
+    print(f"Səsin hədəf müddəti: {audio_duration:.1f} saniyə.")
 
-    # Edge TTS does not provide word-level timestamps here, so estimate
-    # subtitle timing proportionally across the generated audio duration.
+    def ass_stamp(seconds):
+        cs = max(0, int(seconds * 100))
+        hours, cs = divmod(cs, 360000)
+        minutes, cs = divmod(cs, 6000)
+        secs, cs = divmod(cs, 100)
+        return f"{hours}:{minutes:02}:{secs:02}.{cs:02}"
+
+    # Word-level timestamps are estimated proportionally because this workflow
+    # does not request speech timing data from Edge TTS.
     words = re.findall(r"\S+", script)
     if not words:
         raise RuntimeError("The generated script contains no words.")
 
-    audio_duration = get_audio_duration()
     weights = [
         max(1, len(word))
-        + (0.45 if word.endswith((".", "!", "?")) else
-           0.2 if word.endswith((",", ";", ":")) else 0)
+        + (0.65 if word.endswith((".", "!", "?")) else
+           0.25 if word.endswith((",", ";", ":")) else 0)
         for word in words
     ]
     total_weight = sum(weights)
@@ -507,43 +531,61 @@ def create_voice_and_subtitles(script):
     cursor = 0.0
     for word, weight in zip(words, weights):
         word_duration = audio_duration * weight / total_weight
-        boundaries.append({
-            "start": cursor,
-            "duration": word_duration,
-            "text": word,
-        })
+        boundaries.append({"start": cursor, "duration": word_duration, "text": word})
         cursor += word_duration
 
+    # Short captions (3-5 words) are easier to read on mobile screens.
     groups = []
     current = []
     for word in boundaries:
         if current and (
-            len(current) >= 7
-            or word["start"] - (
-                current[-1]["start"] + current[-1]["duration"]
-            ) > 0.65
+            len(current) >= 5
+            or word["start"] - (current[-1]["start"] + current[-1]["duration"]) > 0.55
         ):
             groups.append(current)
             current = []
         current.append(word)
-
     if current:
         groups.append(current)
 
-    lines = []
-    for index, group in enumerate(groups, 1):
+    ass_lines = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        "PlayResX: 1920",
+        "PlayResY: 1080",
+        "WrapStyle: 2",
+        "ScaledBorderAndShadow: yes",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        "Style: Default,DejaVu Sans,54,&H00FFFFFF,&H0000FFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,3,4,1,2,100,100,95,1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+    for group in groups:
         start_time = group[0]["start"]
         end_time = group[-1]["start"] + group[-1]["duration"]
-        caption = " ".join(item["text"] for item in group)
-        lines.extend([
-            str(index),
-            f"{stamp(start_time)} --> {stamp(max(start_time + 0.2, end_time))}",
-            caption,
-            "",
-        ])
+        tokens = [item["text"] for item in group]
+        focus_index = max(
+            range(len(tokens)),
+            key=lambda i: len(re.sub(r"[^A-Za-zƏəIıİiÖöÜüĞğŞşÇç]", "", tokens[i]))
+        )
+        caption_tokens = []
+        for i, token in enumerate(tokens):
+            safe_token = token.replace("{", "(").replace("}", ")")
+            if i == focus_index:
+                caption_tokens.append(r"{\c&H0000FFFF&}" + safe_token + r"{\c&H00FFFFFF&}")
+            else:
+                caption_tokens.append(safe_token)
+        caption = " ".join(caption_tokens)
+        ass_lines.append(
+            f"Dialogue: 0,{ass_stamp(start_time)},{ass_stamp(max(start_time + 0.25, end_time))},"
+            f"Default,,0,0,0,,{caption}"
+        )
 
-    SUBTITLE_FILE.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Edge TTS voice generated ({VOICE}); estimated subtitle timings written.")
+    SUBTITLE_FILE.write_text("\n".join(ass_lines) + "\n", encoding="utf-8")
+    print("Qalın, kontrastlı ASS subtitrləri və sarı vurğulu açar sözlər hazırdır.")
     return audio_duration
 
 def get_audio_duration():
@@ -594,12 +636,7 @@ def make_video(clips, duration):
     subtitle_path = subtitle_path.replace("\\", r"\\").replace(":", r"\:")
     subtitle_path = subtitle_path.replace("'", r"\'")
 
-    filter_arg = (
-        f"subtitles='{subtitle_path}':"
-        "force_style='FontName=DejaVu Sans,FontSize=18,"
-        "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-        "BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=55'"
-    )
+    filter_arg = f"subtitles='{subtitle_path}'"
 
     run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
