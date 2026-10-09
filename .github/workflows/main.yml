@@ -2,11 +2,9 @@
 name: YouTube Automation
 
 on:
-  # Every day at 18:00 UTC (22:00 Azerbaijan time)
+  # Every day at 18:00 UTC (22:00 in Azerbaijan, UTC+4)
   schedule:
     - cron: "0 18 * * *"
-
-  # Allows manual execution
   workflow_dispatch:
 
 permissions:
@@ -22,11 +20,9 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # 1. Download repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -34,33 +30,24 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      # 3. Install system dependencies
-      - name: Install system dependencies
+      - name: Install FFmpeg and subtitle fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          ffmpeg -version
+          ffprobe -version
+          ffmpeg -filters 2>/dev/null | grep subtitles
 
-      # 4. Configure ImageMagick
-      - name: Configure ImageMagick
-        run: |
-          echo "ImageMagick version:"
-          convert -version
-          echo "Checking ImageMagick policy..."
-          if [ -f /etc/ImageMagick-6/policy.xml ]; then
-            grep -n "policy" /etc/ImageMagick-6/policy.xml || true
-          fi
-
-      # 5. Install Python dependencies
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 6. Validate required secrets
       - name: Validate required secrets
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
         run: |
           python - <<'PY'
@@ -69,106 +56,63 @@ jobs:
 
           required = [
               "GEMINI_API_KEY",
-              "CLIENT_SECRETS_JSON",
+              "PEXELS_API_KEY",
+              "PIXABAY_API_KEY",
               "TOKEN_JSON",
           ]
 
           missing = [
-              name for name in required
-              if not os.getenv(name, "").strip()
+              key for key in required
+              if not os.environ.get(key, "").strip()
           ]
 
           if missing:
               raise SystemExit(
-                  "Missing GitHub Actions secrets: "
-                  + ", ".join(missing)
+                  "Missing GitHub Secrets: " + ", ".join(missing)
               )
 
-          for name in ("CLIENT_SECRETS_JSON", "TOKEN_JSON"):
-              try:
-                  json.loads(os.environ[name])
-              except json.JSONDecodeError as exc:
-                  raise SystemExit(
-                      f"{name} is not valid JSON: {exc}"
-                  )
+          try:
+              token = json.loads(os.environ["TOKEN_JSON"])
+          except json.JSONDecodeError as exc:
+              raise SystemExit("TOKEN_JSON is invalid JSON.") from exc
 
-          print("Required secrets exist and JSON is valid.")
+          if not token.get("refresh_token"):
+              raise SystemExit(
+                  "TOKEN_JSON must contain a refresh_token."
+              )
+
+          print("Required Secrets and OAuth token validated.")
           PY
 
-      # 7. Create Google OAuth files
-      - name: Create Google OAuth files
-        env:
-          CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
-          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          files = {
-              "client_secrets.json": "CLIENT_SECRETS_JSON",
-              "token.json": "TOKEN_JSON",
-          }
-
-          for filename, env_name in files.items():
-              content = os.environ[env_name]
-              json.loads(content)
-              Path(filename).write_text(content, encoding="utf-8")
-              print(f"{filename} created and validated.")
-          PY
-
-      # 8. Run YouTube automation
       - name: Run YouTube automation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_TEXT_MODEL: gemini-3.8-flash
-          GEMINI_IMAGE_MODEL: gemini-2.5-flash-image
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          GEMINI_TEXT_MODEL: ${{ vars.GEMINI_TEXT_MODEL }}
           VIDEO_TOPIC: ${{ vars.VIDEO_TOPIC }}
+          EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE }}
+          YOUTUBE_PRIVACY_STATUS: public
           PYTHONUNBUFFERED: "1"
-        run: |
-          python - <<'PY'
-          import os
+        run: python youtube.py
 
-          for name in ("GEMINI_API_KEY", "GEMINI_TEXT_MODEL", "GEMINI_IMAGE_MODEL"):
-              if not os.getenv(name, "").strip():
-                  raise SystemExit(f"Missing environment variable: {name}")
-
-          print("Text model:", os.environ["GEMINI_TEXT_MODEL"])
-          print("Image model:", os.environ["GEMINI_IMAGE_MODEL"])
-          print("Starting YouTube automation...")
-          PY
-
-          python youtube.py
-
-      # 9. Upload generated video
-      - name: Upload generated video
+      - name: Save final MP4
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-video
+          name: youtube-final-video
           path: youtube_short.mp4
           if-no-files-found: warn
           retention-days: 7
 
-      # 10. Upload AI background
-      - name: Upload AI background
+      - name: Save subtitles and voiceover
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ai-background
+          name: youtube-production-files
           path: |
-            background.png
-            background_video.jpg
+            work/subtitles.srt
+            work/voiceover.mp3
           if-no-files-found: ignore
-          retention-days: 7
-
-      # 11. Upload voiceover
-      - name: Upload voiceover
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: voiceover
-          path: voiceover.mp3
-          if-no-files-found: warn
           retention-days: 7
