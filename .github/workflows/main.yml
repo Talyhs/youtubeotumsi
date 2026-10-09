@@ -1,8 +1,6 @@
-
 name: YouTube Automation
 
 on:
-  # Every day at 18:00 UTC (22:00 in Azerbaijan, UTC+4)
   schedule:
     - cron: "0 18 * * *"
   workflow_dispatch:
@@ -53,12 +51,23 @@ jobs:
           python - <<'PY'
           import json
           import os
-required = [
-    "GEMINI_API_KEY",
-    "PEXELS_API_KEY",
-    "PIXABAY_API_KEY",
-    "TOKEN_JSON",
-]
+
+          required = ("GEMINI_API_KEY", "TOKEN_JSON")
+          missing = [
+              name for name in required
+              if not os.environ.get(name, "").strip()
+          ]
+          if missing:
+              raise SystemExit("Missing GitHub Secrets: " + ", ".join(missing))
+
+          if not (
+              os.environ.get("PEXELS_API_KEY", "").strip()
+              or os.environ.get("PIXABAY_API_KEY", "").strip()
+          ):
+              raise SystemExit(
+                  "Add at least one GitHub Secret: "
+                  "PEXELS_API_KEY or PIXABAY_API_KEY"
+              )
 
           try:
               token = json.loads(os.environ["TOKEN_JSON"])
@@ -66,11 +75,11 @@ required = [
               raise SystemExit("TOKEN_JSON is invalid JSON.") from exc
 
           if not token.get("refresh_token"):
-              raise SystemExit(
-                  "TOKEN_JSON must contain a refresh_token."
-              )
+              raise SystemExit("TOKEN_JSON must contain a refresh_token.")
 
-          print("Required Secrets and OAuth token validated.")
+          print("Required secrets and OAuth token validated.")
+          print("Pexels enabled:", bool(os.environ.get("PEXELS_API_KEY", "").strip()))
+          print("Pixabay enabled:", bool(os.environ.get("PIXABAY_API_KEY", "").strip()))
           PY
 
       - name: Run YouTube automation
