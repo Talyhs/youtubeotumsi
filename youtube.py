@@ -87,6 +87,29 @@ def get_gemini_client():
         )
 
     return genai.Client(api_key=api_key)
+    
+def generate_text(prompt):
+    """Generate text using the configured Gemini model."""
+
+    client = get_gemini_client()
+    model = TEXT_MODEL
+
+    print(f"Using Gemini text model: {model}")
+
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+    )
+
+    result = (response.text or "").strip()
+
+    if not result:
+        raise RuntimeError(
+            "Gemini returned empty text. Check API access, "
+            "model availability, quota, and API response."
+        )
+
+    return result
 
 
 TEXT_MODEL = (
