@@ -1,26 +1,32 @@
+
 name: YouTube Automation
 
 on:
-  # Every day at 18:00 UTC
+  # Every day at 18:00 UTC (22:00 Azerbaijan time)
   schedule:
     - cron: "0 18 * * *"
 
-  # Allows manual execution from GitHub Actions
+  # Allows manual execution
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youtube-automation
+  cancel-in-progress: false
 
 jobs:
   run-pipeline:
-
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
-
       # ==========================================
       # 1. Download repository
       # ==========================================
       - name: Checkout repository
         uses: actions/checkout@v4
-
 
       # ==========================================
       # 2. Install Python
@@ -29,8 +35,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
-
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       # ==========================================
       # 3. Install system dependencies
@@ -38,48 +44,103 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-
-          sudo apt-get install -y \
-            ffmpeg \
-            imagemagick
-
+          sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core
 
       # ==========================================
-      # 4. Install Python dependencies
+      # 4. Configure ImageMagick for MoviePy
+      # ==========================================
+      - name: Configure ImageMagick
+        run: |
+          echo "ImageMagick version:"
+          convert -version
+
+          echo "Checking ImageMagick policy..."
+          if [ -f /etc/ImageMagick-6/policy.xml ]; then
+            grep -n "policy" /etc/ImageMagick-6/policy.xml || true
+          fi
+
+      # ==========================================
+      # 5. Install Python dependencies
       # ==========================================
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # ==========================================
+      # 6. Validate required secrets
+      # ==========================================
+      - name: Validate required secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        run: |
+          python - <<'PY'
+          import os
+          required = [
+              "GEMINI_API_KEY",
+              "CLIENT_SECRETS_JSON",
+              "TOKEN_JSON",
+          ]
+          missing = [key for key in required if not os.getenv(key)]
+          if missing:
+              raise SystemExit(
+                  "Missing GitHub Actions secrets: "
+                  + ", ".join(missing)
+              )
+          print("Required secrets are present.")
+          PY
 
       # ==========================================
-      # 5. Create Google OAuth files
+      # 7. Create Google OAuth files
       # ==========================================
       - name: Create Google OAuth files
         env:
           CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
         run: |
+          python - <<'PY'
+          import json
+          import os
 
-          echo "$CLIENT_SECRETS_JSON" > client_secrets.json
-          echo "$TOKEN_JSON" > token.json
+          files = {
+              "client_secrets.json": "CLIENT_SECRETS_JSON",
+              "token.json": "TOKEN_JSON",
+          }
 
-          echo "Google OAuth files created."
+          for filename, env_name in files.items():
+              content = os.environ[env_name]
+              with open(filename, "w", encoding="utf-8") as f:
+                  f.write(content)
 
+              with open(filename, encoding="utf-8") as f:
+                  json.load(f)
+
+              print(f"{filename} created and validated.")
+          PY
 
       # ==========================================
-      # 6. Run YouTube automation
+      # 8. Run YouTube automation
       # ==========================================
       - name: Run YouTube automation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          # Optional: set these repository variables/secrets
+          # to models available to your Google AI account.
+          GEMINI_TEXT_MODEL: ${{ vars.GEMINI_TEXT_MODEL }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
+
+          # Optional: override the default video topic.
+          VIDEO_TOPIC: ${{ vars.VIDEO_TOPIC }}
+
+          PYTHONUNBUFFERED: "1"
         run: |
           python youtube.py
 
-
       # ==========================================
-      # 7. Upload generated video as artifact
+      # 9. Upload generated video as artifact
       # ==========================================
       - name: Upload generated video
         if: always()
@@ -90,9 +151,22 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      # ==========================================
+      # 10. Upload generated AI background
+      # ==========================================
+      - name: Upload AI background
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-background
+          path: |
+            background.png
+            background_video.jpg
+          if-no-files-found: ignore
+          retention-days: 7
 
       # ==========================================
-      # 8. Upload voice file as artifact
+      # 11. Upload generated voiceover
       # ==========================================
       - name: Upload voiceover
         if: always()
