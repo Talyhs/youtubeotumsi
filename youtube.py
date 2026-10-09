@@ -36,12 +36,9 @@ VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural").strip()
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
 if PRIVACY not in {"public", "private", "unlisted"}:
-    raise RuntimeError("YOUTUBE_PRIVACY_STATUS must be public, private or unlisted.")TOPIC = os.getenv("VIDEO_TOPIC", "3 Amazing Facts About Space").strip()
-VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural").strip()
-PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
-
-if PRIVACY not in {"public", "private", "unlisted"}:
-    raise RuntimeError("YOUTUBE_PRIVACY_STATUS must be public, private or unlisted.")
+    raise RuntimeError(
+        "YOUTUBE_PRIVACY_STATUS must be public, private or unlisted."
+    )
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 YOUTUBE_CATEGORY = "27"
