@@ -1,10 +1,10 @@
+
 import os
-import re
 import textwrap
+from pathlib import Path
 
 from google import genai
 from google.genai import types
-
 from gtts import gTTS
 from PIL import Image
 
@@ -18,109 +18,127 @@ from moviepy.editor import (
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 
 # =========================================================
-# 1. CONFIGURATION
+# CONFIGURATION
 # =========================================================
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+BASE_DIR = Path(__file__).resolve().parent
 
-TEXT_MODEL = os.environ.get(
-    "GEMINI_TEXT_MODEL",
-    "gemini-2.5-flash",
-)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 
-IMAGE_MODEL = os.environ.get(
-    "GEMINI_IMAGE_MODEL",
-    "gemini-2.5-flash-image",
-)
+# IMPORTANT: GitHub variables may exist but be empty.
+# "or" ensures that a default model is always selected.
+TEXT_MODEL = (
+    os.environ.get("GEMINI_TEXT_MODEL")
+    or "gemini-2.5-flash"
+).strip() or "gemini-2.5-flash"
 
-TOPIC = os.environ.get(
-    "VIDEO_TOPIC",
-    "3 Amazing Facts About Space",
-)
+IMAGE_MODEL = (
+    os.environ.get("GEMINI_IMAGE_MODEL")
+    or "gemini-2.5-flash-image"
+).strip() or "gemini-2.5-flash-image"
 
-BACKGROUND_IMAGE = "background.png"
-AUDIO_FILE = "voiceover.mp3"
-VIDEO_FILE = "youtube_short.mp4"
-TEMP_IMAGE = "background_video.jpg"
+TOPIC = (
+    os.environ.get("VIDEO_TOPIC")
+    or "3 Amazing Facts About Space"
+).strip() or "3 Amazing Facts About Space"
 
-CLIENT_SECRETS_FILE = "client_secrets.json"
-TOKEN_FILE = "token.json"
+BACKGROUND_IMAGE = BASE_DIR / "background.png"
+AUDIO_FILE = BASE_DIR / "voiceover.mp3"
+VIDEO_FILE = BASE_DIR / "youtube_short.mp4"
+TEMP_IMAGE = BASE_DIR / "background_video.jpg"
+
+CLIENT_SECRETS_FILE = BASE_DIR / "client_secrets.json"
+TOKEN_FILE = BASE_DIR / "token.json"
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload"
 ]
 
 CATEGORY_ID = "28"
-PRIVACY_STATUS = os.environ.get(
-    "YOUTUBE_PRIVACY_STATUS",
-    "public",
-)
+
+PRIVACY_STATUS = (
+    os.environ.get("YOUTUBE_PRIVACY_STATUS") or "public"
+).strip().lower()
+
+if PRIVACY_STATUS not in ("public", "private", "unlisted"):
+    PRIVACY_STATUS = "public"
 
 
 # =========================================================
-# 2. GEMINI CLIENT
+# GEMINI CLIENT
 # =========================================================
 
 def get_gemini_client():
-    """Create and return the Gemini API client."""
+    """Create a Gemini API client."""
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 
     if not api_key:
-        raise ValueError(
-            "GEMINI_API_KEY is missing. "
-            "Add it in GitHub Settings > Secrets and variables > Actions."
+        raise RuntimeError(
+            "GEMINI_API_KEY is missing. Add it under "
+            "GitHub Settings > Secrets and variables > Actions."
         )
 
     return genai.Client(api_key=api_key)
 
 
-# =========================================================
-# 3. GENERATE ENGLISH SCRIPT
-# =========================================================
-
-def generate_script(topic):
-    """Generate a short English YouTube Shorts script."""
-
-    print("1. Generating English script...")
+def generate_text(prompt):
+    """Generate text using a configured Gemini text model."""
 
     client = get_gemini_client()
 
+    model = (
+        os.environ.get("GEMINI_TEXT_MODEL")
+        or "gemini-2.5-flash"
+    ).strip() or "gemini-2.5-flash"
+
+    print(f"Using Gemini text model: {model}")
+
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+    )
+
+    result = (response.text or "").strip()
+
+    if not result:
+        raise RuntimeError(
+            "Gemini returned empty text. Check model access, "
+            "API key, quota and API response."
+        )
+
+    return result
+
+
+# =========================================================
+# GENERATE ENGLISH SCRIPT
+# =========================================================
+
+def generate_script(topic):
+    print("1. Generating English script...")
+
     prompt = f"""
-Create an engaging YouTube Shorts script in English.
+Write an engaging YouTube Shorts voiceover script in English.
 
 TOPIC: {topic}
 
 Requirements:
-- 30-50 words.
-- Start with a strong hook.
-- Make it exciting and easy to understand.
+- Approximately 40-80 words.
+- Start with an interesting hook.
 - Use natural spoken English.
-- Suitable for an international audience.
+- Make it informative and entertaining.
+- Suitable for a general international audience.
 - No emojis.
-- Do not write a title.
-- Do not say hello.
-- Return only the spoken script.
+- No title or scene directions.
+- Return only the words to be spoken.
 """
 
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=prompt,
-    )
-
-    script = (response.text or "").strip()
-
-    if not script:
-        raise RuntimeError(
-            "Gemini returned an empty script. "
-            "Check the model name, API key and quota."
-        )
+    script = generate_text(prompt)
 
     print("\n========== SCRIPT ==========")
     print(script)
@@ -130,53 +148,40 @@ Requirements:
 
 
 # =========================================================
-# 4. GENERATE TITLE, DESCRIPTION, TAGS AND IMAGE IDEA
+# GENERATE VIDEO METADATA
 # =========================================================
 
 def generate_video_metadata(script):
-    """Generate YouTube metadata and a matching image concept."""
-
     print("2. Generating video title and metadata...")
 
-    client = get_gemini_client()
-
     prompt = f"""
-Create YouTube Shorts metadata for this English video script.
+Create metadata for a YouTube Shorts video.
 
 SCRIPT:
 {script}
 
 Return exactly these four lines:
-TITLE: a catchy, accurate title under 70 characters
-DESCRIPTION: a short, relevant description
+TITLE: a catchy accurate title under 70 characters
+DESCRIPTION: a concise description relevant to the script
 TAGS: 8 relevant comma-separated keywords
-IMAGE IDEA: a detailed visual concept for the video background
+IMAGE IDEA: a detailed visual idea for the background image
 
 Rules:
-- Use English.
-- Do not use misleading claims.
-- Do not add explanations outside these four lines.
+- English only.
+- No misleading claims.
+- Do not include extra commentary.
 - The image idea must match the script.
 """
 
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=prompt,
-    )
-
-    result = (response.text or "").strip()
-
-    if not result:
-        raise RuntimeError(
-            "Gemini failed to generate video metadata."
-        )
-
+    result = generate_text(prompt)
     fields = {}
 
     for line in result.splitlines():
-        if ":" in line:
-            key, value = line.split(":", 1)
-            fields[key.strip().upper()] = value.strip()
+        if ":" not in line:
+            continue
+
+        key, value = line.split(":", 1)
+        fields[key.strip().upper()] = value.strip()
 
     title = fields.get("TITLE", "").strip()
     description = fields.get("DESCRIPTION", "").strip()
@@ -184,13 +189,13 @@ Rules:
     image_idea = fields.get("IMAGE IDEA", "").strip()
 
     if not title:
-        raise RuntimeError(
-            "Gemini did not return a valid video title."
-        )
+        title = script.split(".")[0][:65].strip()
+        if not title:
+            title = "Amazing Facts You Should Know"
 
     if not description:
         description = (
-            "Discover amazing facts in this YouTube Shorts video!"
+            "Discover something amazing in this short video."
         )
 
     tags = [
@@ -200,88 +205,82 @@ Rules:
     ]
 
     if not tags:
-        tags = [
-            "facts",
-            "science",
-            "education",
-            "shorts",
-        ]
+        tags = ["facts", "education", "science", "shorts"]
 
-    # Keep YouTube tags within a reasonable count.
     tags = tags[:15]
 
-    description += "\n\n#Shorts #Facts #Education"
+    if "#Shorts" not in description:
+        description += "\n\n#Shorts"
 
-    print("Video title:", title)
+    if not image_idea:
+        image_idea = (
+            "A cinematic, realistic visual representation of: "
+            + script[:500]
+        )
+
+    print("Title:", title)
     print("Image idea:", image_idea)
 
     return title, description, tags, image_idea
 
 
 # =========================================================
-# 5. GENERATE ENGLISH VOICEOVER
+# GENERATE VOICEOVER
 # =========================================================
 
 def create_voice(script):
-    """Convert the script to English speech."""
-
     print("3. Generating English voiceover...")
 
-    tts = gTTS(
-        text=script,
-        lang="en",
-        slow=False,
-    )
+    tts = gTTS(text=script, lang="en", slow=False)
+    tts.save(str(AUDIO_FILE))
 
-    tts.save(AUDIO_FILE)
+    if not AUDIO_FILE.is_file() or AUDIO_FILE.stat().st_size == 0:
+        raise RuntimeError("Voiceover file was not created.")
 
-    if not os.path.isfile(AUDIO_FILE):
-        raise RuntimeError(
-            "The voiceover audio file was not created."
-        )
-
-    print("Voiceover created:", AUDIO_FILE)
-
-    return AUDIO_FILE
+    print("Voiceover saved:", AUDIO_FILE.name)
+    return str(AUDIO_FILE)
 
 
 # =========================================================
-# 6. GENERATE AI BACKGROUND IMAGE
+# GENERATE TOPIC-SPECIFIC AI BACKGROUND
 # =========================================================
 
 def generate_background_image(script, title, image_idea):
-    """Generate an image that matches the video's topic."""
-
-    print("4. Generating topic-specific AI image...")
+    print("4. Generating AI background image...")
 
     client = get_gemini_client()
 
-    prompt = f"""
-Create an actual cinematic image for a YouTube Shorts video.
+    model = (
+        os.environ.get("GEMINI_IMAGE_MODEL")
+        or "gemini-2.5-flash-image"
+    ).strip() or "gemini-2.5-flash-image"
 
-VIDEO TITLE:
+    print("Using Gemini image model:", model)
+
+    prompt = f"""
+Generate an actual image for a vertical YouTube Shorts video.
+
+TITLE:
 {title}
 
-VIDEO SCRIPT:
+SCRIPT:
 {script}
 
 VISUAL CONCEPT:
 {image_idea}
 
-Requirements:
+Image requirements:
 - Portrait 9:16 composition.
-- The image must match the topic and script.
-- Make the main subject large, clear and interesting.
-- Professional cinematic lighting.
-- Detailed, visually appealing composition.
-- Suitable for a general international audience.
+- Match the topic and script accurately.
+- Strong central subject and cinematic lighting.
+- High visual quality and clear details.
 - Leave some uncluttered space for subtitles.
-- No text, letters, logos or watermarks.
-- Return a generated image, not a text description.
+- No text, letters, captions, logos or watermarks.
+- Return an image, not a written description.
 """
 
     response = client.models.generate_content(
-        model=IMAGE_MODEL,
+        model=model,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE"],
@@ -293,40 +292,39 @@ Requirements:
     )
 
     for part in (response.parts or []):
+        if getattr(part, "inline_data", None) is None:
+            continue
 
-        if part.inline_data is not None:
-            generated_image = part.as_image()
-            generated_image.save(BACKGROUND_IMAGE)
+        image = part.as_image()
 
-            # Confirm that the image is valid.
-            with Image.open(BACKGROUND_IMAGE) as image:
-                image.verify()
+        if image is None:
+            continue
 
-            print(
-                "AI background created:",
-                BACKGROUND_IMAGE,
-            )
+        image.save(str(BACKGROUND_IMAGE))
 
-            return BACKGROUND_IMAGE
+        # Verify that the output is a valid image.
+        with Image.open(BACKGROUND_IMAGE) as check:
+            check.verify()
+
+        print("AI background saved:", BACKGROUND_IMAGE.name)
+        return str(BACKGROUND_IMAGE)
 
     raise RuntimeError(
-        "Gemini did not return an image. "
-        "Check the IMAGE_MODEL name, API access and quota."
+        "Gemini did not return an image. Check whether the image "
+        "model is available to your API key, and check API quota."
     )
 
 
 # =========================================================
-# 7. CREATE VERTICAL SHORTS VIDEO
+# CREATE VERTICAL VIDEO
 # =========================================================
 
 def create_video(audio_file, script):
-    """Combine the background image, voiceover and subtitles."""
+    print("5. Creating vertical YouTube Shorts video...")
 
-    print("5. Creating YouTube Shorts video...")
-
-    if not os.path.isfile(BACKGROUND_IMAGE):
+    if not BACKGROUND_IMAGE.is_file():
         raise FileNotFoundError(
-            f"{BACKGROUND_IMAGE} was not found."
+            f"Background image is missing: {BACKGROUND_IMAGE}"
         )
 
     audio = None
@@ -339,45 +337,48 @@ def create_video(audio_file, script):
         duration = audio.duration
 
         if not duration or duration <= 0:
-            raise RuntimeError(
-                "The voiceover has an invalid duration."
-            )
+            raise RuntimeError("Voiceover duration is invalid.")
 
-        # Convert the generated image to a video-friendly format.
-        with Image.open(BACKGROUND_IMAGE) as image:
-            image.convert("RGB").save(
-                TEMP_IMAGE,
-                quality=95,
-            )
+        # Convert to RGB JPEG for MoviePy compatibility.
+        with Image.open(BACKGROUND_IMAGE) as img:
+            img = img.convert("RGB")
 
-        # MoviePy 1.x API.
+            target_ratio = 9 / 16
+            current_ratio = img.width / img.height
+
+            if current_ratio > target_ratio:
+                new_width = int(img.height * target_ratio)
+                left = (img.width - new_width) // 2
+                img = img.crop(
+                    (left, 0, left + new_width, img.height)
+                )
+            else:
+                new_height = int(img.width / target_ratio)
+                top = (img.height - new_height) // 2
+                img = img.crop(
+                    (0, top, img.width, top + new_height)
+                )
+
+            img = img.resize((1080, 1920))
+            img.save(TEMP_IMAGE, quality=95)
+
         background = (
-            ImageClip(TEMP_IMAGE)
-            .resize(height=1920)
+            ImageClip(str(TEMP_IMAGE))
             .set_duration(duration)
         )
 
-        # Center-crop to 1080 x 1920.
-        background = background.crop(
-            width=1080,
-            height=1920,
-            x_center=background.w / 2,
-            y_center=background.h / 2,
-        )
-
-        wrapped_text = textwrap.fill(
-            script,
-            width=32,
-        )
-
+        # Add readable subtitles. If ImageMagick cannot render text,
+        # continue with the background and voiceover.
         try:
+            wrapped = textwrap.fill(script, width=30)
+
             text_clip = (
                 TextClip(
-                    wrapped_text,
-                    fontsize=55,
+                    wrapped,
+                    fontsize=52,
                     color="white",
                     bg_color="black",
-                    size=(950, None),
+                    size=(940, None),
                     method="caption",
                     align="center",
                 )
@@ -391,7 +392,7 @@ def create_video(audio_file, script):
             )
 
         except Exception as error:
-            print("Subtitle creation failed:", error)
+            print("Subtitle rendering failed:", str(error))
             print("Continuing without subtitles.")
 
             video = CompositeVideoClip(
@@ -402,20 +403,23 @@ def create_video(audio_file, script):
         video = video.set_audio(audio)
 
         video.write_videofile(
-            VIDEO_FILE,
+            str(VIDEO_FILE),
             fps=30,
             codec="libx264",
             audio_codec="aac",
             preset="medium",
             threads=2,
+            logger="bar",
         )
 
-        print("Video created:", VIDEO_FILE)
+        if not VIDEO_FILE.is_file() or VIDEO_FILE.stat().st_size == 0:
+            raise RuntimeError("Video output was not created.")
 
-        return VIDEO_FILE
+        print("Video saved:", VIDEO_FILE.name)
+        return str(VIDEO_FILE)
 
     finally:
-        # Close MoviePy resources.
+        # Close resources even when video creation fails.
         if video is not None:
             video.close()
 
@@ -430,93 +434,84 @@ def create_video(audio_file, script):
 
 
 # =========================================================
-# 8. YOUTUBE AUTHENTICATION
+# YOUTUBE AUTHENTICATION
 # =========================================================
 
 def get_youtube_service():
-    """Authenticate with YouTube using the saved OAuth token."""
-
     print("6. Connecting to YouTube...")
 
     credentials = None
 
-    # Support either secret name.
+    # Prefer the secret name used by this workflow.
     token_json = (
-        os.environ.get("YOUTUBE_TOKEN_JSON")
-        or os.environ.get("TOKEN_JSON")
+        os.environ.get("TOKEN_JSON")
+        or os.environ.get("YOUTUBE_TOKEN_JSON")
     )
 
-    # On GitHub Actions, write the secret to token.json.
     if token_json:
-        with open(TOKEN_FILE, "w", encoding="utf-8") as token:
-            token.write(token_json)
+        TOKEN_FILE.write_text(token_json, encoding="utf-8")
 
-    if os.path.isfile(TOKEN_FILE):
+    if TOKEN_FILE.is_file():
         credentials = Credentials.from_authorized_user_file(
-            TOKEN_FILE,
+            str(TOKEN_FILE),
             SCOPES,
         )
 
-    if not credentials or not credentials.valid:
+    if credentials and credentials.expired and credentials.refresh_token:
+        print("Refreshing YouTube OAuth token...")
+        credentials.refresh(Request())
 
-        if (
-            credentials
-            and credentials.expired
-            and credentials.refresh_token
-        ):
-            print("Refreshing YouTube access token...")
-            credentials.refresh(Request())
-
-        else:
-            # GitHub Actions cannot complete an interactive login.
-            if os.environ.get("GITHUB_ACTIONS") == "true":
-                raise RuntimeError(
-                    "YouTube OAuth is not configured correctly. "
-                    "Create token.json locally with a refresh token "
-                    "and save its complete JSON as the "
-                    "YOUTUBE_TOKEN_JSON GitHub Actions secret."
-                )
-
-            if not os.path.isfile(CLIENT_SECRETS_FILE):
-                raise FileNotFoundError(
-                    f"{CLIENT_SECRETS_FILE} is missing."
-                )
-
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CLIENT_SECRETS_FILE,
-                SCOPES,
+    elif not credentials or not credentials.valid:
+        # GitHub Actions cannot interactively open a browser to sign in.
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            raise RuntimeError(
+                "YouTube OAuth credentials are missing or invalid. "
+                "Create a valid token.json with a refresh token locally, "
+                "then save its full JSON as the TOKEN_JSON GitHub secret."
             )
 
-            credentials = flow.run_local_server(
-                port=0,
-                access_type="offline",
-                prompt="consent",
+        if not CLIENT_SECRETS_FILE.is_file():
+            raise FileNotFoundError(
+                "client_secrets.json is missing. Configure Google OAuth."
             )
 
-        with open(TOKEN_FILE, "w", encoding="utf-8") as token:
-            token.write(credentials.to_json())
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(CLIENT_SECRETS_FILE),
+            SCOPES,
+        )
+
+        credentials = flow.run_local_server(
+            port=0,
+            access_type="offline",
+            prompt="consent",
+        )
+
+    # Save updated credentials locally.
+    TOKEN_FILE.write_text(
+        credentials.to_json(),
+        encoding="utf-8",
+    )
 
     return build(
         "youtube",
         "v3",
         credentials=credentials,
+        cache_discovery=False,
     )
 
 
 # =========================================================
-# 9. UPLOAD VIDEO TO YOUTUBE
+# UPLOAD VIDEO
 # =========================================================
 
 def upload_to_youtube(video_file, title, description, tags):
-    """Upload the generated video to the YouTube channel."""
-
     print("7. Uploading video to YouTube...")
 
     youtube = get_youtube_service()
 
     body = {
         "snippet": {
-            "title": title,
+            "title": title[:100],
             "description": description,
             "tags": tags,
             "categoryId": CATEGORY_ID,
@@ -550,12 +545,10 @@ def upload_to_youtube(video_file, title, description, tags):
             print(f"Upload progress: {progress}%")
 
     video_id = response["id"]
-    video_url = (
-        f"https://www.youtube.com/watch?v={video_id}"
-    )
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
 
     print("\n================================")
-    print("VIDEO UPLOADED SUCCESSFULLY!")
+    print("VIDEO UPLOADED SUCCESSFULLY")
     print("Title:", title)
     print("Video ID:", video_id)
     print("URL:", video_url)
@@ -565,42 +558,39 @@ def upload_to_youtube(video_file, title, description, tags):
 
 
 # =========================================================
-# 10. MAIN PIPELINE
+# MAIN PIPELINE
 # =========================================================
 
 def main():
-
     print()
     print("====================================")
     print("     ENGLISH YOUTUBE AUTOMATION")
     print("====================================")
     print()
 
-    # Step 1: Generate script.
+    print("Topic:", TOPIC)
+    print("Text model:", TEXT_MODEL)
+    print("Image model:", IMAGE_MODEL)
+
     script = generate_script(TOPIC)
 
-    # Step 2: Generate metadata and visual concept.
     title, description, tags, image_idea = (
         generate_video_metadata(script)
     )
 
-    # Step 3: Generate voiceover.
     audio_file = create_voice(script)
 
-    # Step 4: Generate the AI background.
     generate_background_image(
         script,
         title,
         image_idea,
     )
 
-    # Step 5: Create the vertical video.
     video_file = create_video(
         audio_file,
         script,
     )
 
-    # Step 6: Upload to YouTube.
     upload_to_youtube(
         video_file,
         title,
@@ -615,4 +605,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        print()
+        print("ERROR: YouTube automation failed.")
+        print(f"{type(error).__name__}: {error}")
+        raise
