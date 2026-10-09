@@ -120,6 +120,7 @@ jobs:
               print(f"{filename} created and validated.")
           PY
 
+
       # ==========================================
       # 8. Run YouTube automation
       # ==========================================
@@ -127,16 +128,29 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-          # Optional: set these repository variables/secrets
-          # to models available to your Google AI account.
-          GEMINI_TEXT_MODEL: ${{ vars.GEMINI_TEXT_MODEL }}
-          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
+          # Default model names are used if repository variables are empty.
+          GEMINI_TEXT_MODEL: ${{ vars.GEMINI_TEXT_MODEL || 'gemini-2.5-flash' }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image' }}
 
-          # Optional: override the default video topic.
+          # Optional video topic
           VIDEO_TOPIC: ${{ vars.VIDEO_TOPIC }}
 
           PYTHONUNBUFFERED: "1"
         run: |
+          python - <<'PY'
+          import os
+
+          required = ["GEMINI_API_KEY"]
+          missing = [name for name in required if not os.getenv(name, "").strip()]
+
+          if missing:
+              raise SystemExit("Missing GitHub Actions secrets: " + ", ".join(missing))
+
+          print("Text model:", os.getenv("GEMINI_TEXT_MODEL"))
+          print("Image model:", os.getenv("GEMINI_IMAGE_MODEL"))
+          print("Starting YouTube automation...")
+          PY
+
           python youtube.py
 
       # ==========================================
