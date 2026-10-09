@@ -28,46 +28,15 @@ SCENE_FILE = WORK / "scenes.txt"
 TOKEN_FILE = BASE / "token.json"
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-
-def check_configuration():
-    missing = []
-
-    if not GEMINI_KEY:
-        missing.append("GEMINI_API_KEY")
-
-    if not (PEXELS_KEY or PIXABAY_KEY):
-        missing.append(
-            "PIXABAY_API_KEY or PEXELS_API_KEY "
-            "(at least one stock video API key is required)"
-        )
-
-    if not os.getenv("TOKEN_JSON", "").strip():
-        missing.append("TOKEN_JSON")
-
-    if missing:
-        raise RuntimeError(
-            "Missing required configuration: " + ", ".join(missing)
-        )
-
-    run(["ffmpeg", "-version"])
-    run(["ffprobe", "-version"])
-
-    try:
-        token = json.loads(os.environ["TOKEN_JSON"])
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("TOKEN_JSON is not valid JSON.") from exc
-
-    if not token.get("refresh_token"):
-        raise RuntimeError(
-            "TOKEN_JSON must contain a valid OAuth refresh_token."
-        )
-
-    print("Configuration validated.")
-    print("Pexels enabled:", bool(PEXELS_KEY))
-    print("Pixabay enabled:", bool(PIXABAY_KEY))
-
+PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
+PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip()
 TOPIC = os.getenv("VIDEO_TOPIC", "3 Amazing Facts About Space").strip()
+VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural").strip()
+PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
+
+if PRIVACY not in {"public", "private", "unlisted"}:
+    raise RuntimeError("YOUTUBE_PRIVACY_STATUS must be public, private or unlisted.")TOPIC = os.getenv("VIDEO_TOPIC", "3 Amazing Facts About Space").strip()
 VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural").strip()
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
@@ -97,16 +66,22 @@ def run(command):
 
 
 def check_configuration():
-    missing = [
-        name for name, value in {
-            "GEMINI_API_KEY": GEMINI_KEY,
-            "PEXELS_API_KEY": PEXELS_KEY,
-            "PIXABAY_API_KEY": PIXABAY_KEY,
-            "TOKEN_JSON": os.getenv("TOKEN_JSON", ""),
-        }.items() if not value.strip()
-    ]
+    missing = []
+
+    if not GEMINI_KEY:
+        missing.append("GEMINI_API_KEY")
+
+    if not os.getenv("TOKEN_JSON", "").strip():
+        missing.append("TOKEN_JSON")
+
+    if not (PEXELS_KEY or PIXABAY_KEY):
+        missing.append(
+            "Add at least one stock-video secret: "
+            "PEXELS_API_KEY or PIXABAY_API_KEY"
+        )
+
     if missing:
-        raise RuntimeError("Missing GitHub Secrets: " + ", ".join(missing))
+        raise RuntimeError("Missing required configuration: " + ", ".join(missing))
 
     run(["ffmpeg", "-version"])
     run(["ffprobe", "-version"])
@@ -118,10 +93,12 @@ def check_configuration():
 
     if not token.get("refresh_token"):
         raise RuntimeError(
-            "TOKEN_JSON must contain a valid OAuth refresh_token. "
-            "Create an offline OAuth token locally."
+            "TOKEN_JSON must contain a valid OAuth refresh_token."
         )
 
+    print("Configuration validated.")
+    print("Pexels enabled:", bool(PEXELS_KEY))
+    print("Pixabay enabled:", bool(PIXABAY_KEY))
 
 def generate_text(prompt):
     client = genai.Client(api_key=GEMINI_KEY)
