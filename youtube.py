@@ -32,10 +32,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 
 # IMPORTANT: GitHub variables may exist but be empty.
 # "or" ensures that a default model is always selected.
-TEXT_MODEL = (
-    os.environ.get("GEMINI_TEXT_MODEL", "").strip()
-    or "gemini-3.8-flash"
-)
+
+model = TEXT_MODEL
 
 IMAGE_MODEL = (
     os.environ.get("GEMINI_IMAGE_MODEL", "").strip()
