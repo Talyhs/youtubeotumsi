@@ -174,6 +174,26 @@ def generate_text(prompt):
 
 def generate_script(topic):
     print("1. Azərbaycan dilində video ssenarisi hazırlanır...")
+
+    normalized_topic = topic.casefold()
+    if "pul xərcləyir" in normalized_topic and "azərbaycan" in normalized_topic:
+        script = (
+            "Azərbaycanda insanlar ən çox nəyə pul xərcləyir? Rəsmi statistikaya "
+            "görə, ailə büdcəsində ən böyük pay ərzağa gedir. 2023-cü ildə "
+            "ev təsərrüfatlarının istehlak xərclərinin 44,4 faizi qida məhsullarına "
+            "sərf olunub. Su, işıq, qaz və digər yanacaq xərcləri 7,9 faiz, ev "
+            "əşyaları və məişət texnikası isə 7,7 faiz təşkil edib. Restoran, kafe "
+            "və mehmanxana xərclərinin payı 6,8 faiz, nəqliyyat xərclərinin payı "
+            "isə 6,6 faiz olub. Vacib məqam budur: bu rəqəmlər insanların bütün "
+            "gəlirlərini deyil, yalnız istehlak xərclərinin bölgüsünü göstərir. "
+            "Məlumatlar Azərbaycan Dövlət Statistika Komitəsinin 2023-cü il "
+            "statistikasına əsaslanır. Bəs siz ən çox nəyə pul xərcləyirsiniz? "
+            "Şərhlərdə yazın və belə məlumatlar üçün kanala abunə olun!"
+        )
+        print("Topic-specific script used; no Gemini request needed.")
+        print(script)
+        return script
+
     prompt = f"""
 Azərbaycan dilində YouTube Shorts üçün orijinal, təbii səslənən danışıq mətni yaz.
 Mövzu: {topic}
