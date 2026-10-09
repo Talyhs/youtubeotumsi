@@ -1,5 +1,4 @@
 
-import asyncio
 import json
 import os
 import re
@@ -8,7 +7,6 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-import edge_tts
 import requests
 from google import genai
 from google.auth.transport.requests import Request
@@ -22,7 +20,7 @@ WORK = BASE / "work"
 WORK.mkdir(exist_ok=True)
 
 VIDEO_FILE = BASE / "youtube_short.mp4"
-AUDIO_FILE = WORK / "voiceover.mp3"
+AUDIO_FILE = WORK / "voiceover.wav"
 SUBTITLE_FILE = WORK / "subtitles.srt"
 SCENE_FILE = WORK / "scenes.txt"
 TOKEN_FILE = BASE / "token.json"
@@ -32,7 +30,7 @@ PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
 TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "3 Amazing Facts About Space"
-VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or "en-US-AriaNeural"
+VOICE = os.getenv("KOKORO_VOICE", "").strip() or "af_heart"
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
 if PRIVACY not in {"public", "private", "unlisted"}:
@@ -373,32 +371,35 @@ def collect_clips(queries, wanted=5):
 
 
 def create_voice_and_subtitles(script):
-    print("4. Generating Edge-TTS neural voice and timed captions...")
+    print("4. Generating Kokoro TTS voice and timed captions...")
 
-    async def synthesize():
-        communicate = edge_tts.Communicate(
-            script,
-            VOICE,
-            rate="+0%",
-        )
-        boundaries = []
+    import numpy as np
+    import soundfile as sf
+    from kokoro import KPipeline
 
-        with open(AUDIO_FILE, "wb") as audio:
-            async for item in communicate.stream():
-                if item["type"] == "audio":
-                    audio.write(item["data"])
-                elif item["type"] == "WordBoundary":
-                    boundaries.append({
-                        "start": item["offset"] / 10_000_000,
-                        "duration": item["duration"] / 10_000_000,
-                        "text": item["text"],
-                    })
-        return boundaries
+    if not script.strip():
+        raise RuntimeError("Cannot synthesize an empty script.")
 
-    boundaries = asyncio.run(synthesize())
+    # American English Kokoro voice; audio is generated locally by the model.
+    pipeline = KPipeline(lang_code="a")
+    audio_chunks = []
+    for _, graphemes, _, audio in pipeline(
+        script,
+        voice=VOICE,
+        speed=1.0,
+        split_pattern=r"\n+",
+    ):
+        if audio is not None and len(audio):
+            audio_chunks.append(np.asarray(audio, dtype=np.float32))
+
+    if not audio_chunks:
+        raise RuntimeError("Kokoro did not return any audio.")
+
+    audio_data = np.concatenate(audio_chunks)
+    sf.write(str(AUDIO_FILE), audio_data, 24000, subtype="PCM_16")
 
     if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
-        raise RuntimeError("Edge-TTS did not create an audio file.")
+        raise RuntimeError("Kokoro did not create an audio file.")
 
     def stamp(seconds):
         ms = max(0, int(seconds * 1000))
@@ -407,39 +408,39 @@ def create_voice_and_subtitles(script):
         seconds, ms = divmod(ms, 1000)
         return f"{hours:02}:{minutes:02}:{seconds:02},{ms:03}"
 
-    # Some Edge-TTS responses contain audio but omit WordBoundary events.
-    # In that case, estimate word timings across the real audio duration so the
-    # pipeline can still produce readable, approximately synchronized captions.
-    if not boundaries:
-        words = re.findall(r"\S+", script)
-        if not words:
-            raise RuntimeError("The generated script contains no words.")
-        audio_duration = get_audio_duration()
-        weights = [
-            max(1, len(word)) + (0.45 if word.endswith((".", "!", "?")) else
-                                 0.2 if word.endswith((",", ";", ":")) else 0)
-            for word in words
-        ]
-        total_weight = sum(weights)
-        cursor = 0.0
-        for word, weight in zip(words, weights):
-            word_duration = audio_duration * weight / total_weight
-            boundaries.append({
-                "start": cursor,
-                "duration": word_duration,
-                "text": word,
-            })
-            cursor += word_duration
-        print("Warning: Edge-TTS supplied no word boundaries; using estimated subtitle timings.")
+    # Kokoro returns audio chunks rather than word-level timestamps. Estimate
+    # word timings across the actual generated audio duration for readable captions.
+    words = re.findall(r"\S+", script)
+    if not words:
+        raise RuntimeError("The generated script contains no words.")
 
-    # Group words into short readable captions using available speech timings.
+    audio_duration = get_audio_duration()
+    weights = [
+        max(1, len(word))
+        + (0.45 if word.endswith((".", "!", "?")) else
+           0.2 if word.endswith((",", ";", ":")) else 0)
+        for word in words
+    ]
+    total_weight = sum(weights)
+    boundaries = []
+    cursor = 0.0
+    for word, weight in zip(words, weights):
+        word_duration = audio_duration * weight / total_weight
+        boundaries.append({
+            "start": cursor,
+            "duration": word_duration,
+            "text": word,
+        })
+        cursor += word_duration
+
     groups = []
     current = []
-
     for word in boundaries:
         if current and (
             len(current) >= 7
-            or word["start"] - (current[-1]["start"] + current[-1]["duration"]) > 0.65
+            or word["start"] - (
+                current[-1]["start"] + current[-1]["duration"]
+            ) > 0.65
         ):
             groups.append(current)
             current = []
@@ -450,19 +451,19 @@ def create_voice_and_subtitles(script):
 
     lines = []
     for index, group in enumerate(groups, 1):
-        start = group[0]["start"]
-        end = group[-1]["start"] + group[-1]["duration"]
-        text = " ".join(w["text"] for w in group)
+        start_time = group[0]["start"]
+        end_time = group[-1]["start"] + group[-1]["duration"]
+        caption = " ".join(item["text"] for item in group)
         lines.extend([
             str(index),
-            f"{stamp(start)} --> {stamp(max(start + 0.2, end))}",
-            text,
+            f"{stamp(start_time)} --> {stamp(max(start_time + 0.2, end_time))}",
+            caption,
             "",
         ])
 
     SUBTITLE_FILE.write_text("\n".join(lines), encoding="utf-8")
-    return get_audio_duration()
-
+    print(f"Kokoro voice generated ({VOICE}); estimated subtitle timings written.")
+    return audio_duration
 
 def get_audio_duration():
     value = run([
