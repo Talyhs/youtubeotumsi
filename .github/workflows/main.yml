@@ -92,6 +92,7 @@ jobs:
           GEMINI_TEXT_MODEL: gemini-3.8-flash
           EDGE_TTS_VOICE: az-AZ-BabekNeural
           YOUTUBE_PRIVACY_STATUS: public
+          TARGET_VIDEO_SECONDS: "193"
           PYTHONUNBUFFERED: "1"
         run: python youtube.py
 
@@ -110,7 +111,7 @@ jobs:
         with:
           name: youtube-production-files
           path: |
-            work/subtitles.srt
+            work/subtitles.ass
             work/voiceover.mp3
           if-no-files-found: ignore
           retention-days: 7
