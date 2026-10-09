@@ -438,7 +438,7 @@ def create_voice_and_subtitles(script):
 
     # Edge TTS does not provide word-level timestamps here, so estimate
     # subtitle timing proportionally across the generated audio duration.
-    words = re.findall(r"\\S+", script)
+    words = re.findall(r"\S+", script)
     if not words:
         raise RuntimeError("The generated script contains no words.")
 
@@ -489,7 +489,7 @@ def create_voice_and_subtitles(script):
             "",
         ])
 
-    SUBTITLE_FILE.write_text("\\n".join(lines), encoding="utf-8")
+    SUBTITLE_FILE.write_text("\n".join(lines), encoding="utf-8")
     print(f"Edge TTS voice generated ({VOICE}); estimated subtitle timings written.")
     return audio_duration
 
