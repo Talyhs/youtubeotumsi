@@ -20,7 +20,7 @@ WORK = BASE / "work"
 WORK.mkdir(exist_ok=True)
 
 VIDEO_FILE = BASE / "youtube_short.mp4"
-AUDIO_FILE = WORK / "voiceover.wav"
+AUDIO_FILE = WORK / "voiceover.mp3"
 SUBTITLE_FILE = WORK / "subtitles.srt"
 SCENE_FILE = WORK / "scenes.txt"
 TOKEN_FILE = BASE / "token.json"
@@ -30,7 +30,7 @@ PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
 TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "3 Amazing Facts About Space"
-VOICE = os.getenv("KOKORO_VOICE", "").strip() or "af_heart"
+VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or "az-AZ-BabekNeural"
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
 if PRIVACY not in {"public", "private", "unlisted"}:
@@ -173,17 +173,21 @@ def generate_text(prompt):
     ) from last_error
 
 def generate_script(topic):
-    print("1. Generating English script...")
+    print("1. Azərbaycan dilində video ssenarisi hazırlanır...")
     prompt = f"""
-Write an original English YouTube Shorts voiceover about: {topic}
+Azərbaycan dilində YouTube Shorts üçün orijinal, təbii səslənən danışıq mətni yaz.
+Mövzu: {topic}
 
-Requirements:
-- Around 80-120 words.
-- Engaging opening and clear ending.
-- Accurate, informative and natural spoken English.
-- Avoid unsupported factual claims.
-- No scene directions, markdown or title.
-Return only the spoken script.
+Tələblər:
+- Təxminən 100-140 Azərbaycan sözü.
+- İlk cümlə izləyicinin diqqətini cəlb etsin.
+- Səlis, düzgün Azərbaycan dilindən istifadə et.
+- Mövzu Azərbaycanda ev təsərrüfatlarının xərcləridirsə, 2023-cü ilin rəsmi statistikasını əsas götür: istehlak xərclərinin 44,4%-i ərzaq, 7,9%-i su/işıq/qaz və digər yanacaq, 7,7%-i ev əşyaları və məişət texnikası, 6,8%-i restoran/kafe/mehmanxana, 6,6%-i nəqliyyat xərcləridir.
+- Bu faizlərin ümumi gəlirin deyil, istehlak xərclərinin payı olduğunu düzgün izah et.
+- Rəqəmləri başqa il üçün aktual kimi təqdim etmə.
+- Rəsmi mənbə kimi Azərbaycan Dövlət Statistika Komitəsini qeyd et.
+- Sonda izləyiciyə sual ver və abunə olmağa qısa çağırış et.
+- Başlıq, markdown və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
 """
     script = generate_text(prompt)
     print(script)
@@ -191,42 +195,35 @@ Return only the spoken script.
 
 
 def generate_metadata(script):
-    """
-    Build metadata locally so a second Gemini request cannot exhaust the
-    project's daily API quota. Keep this deterministic and safe for automation.
-    """
-    print("2. Generating metadata and stock-video search terms locally...")
+    """Create Azerbaijani SEO metadata locally without another Gemini request."""
+    print("2. Azərbaycan dilində SEO başlığı, açıqlama və etiketlər hazırlanır...")
 
-    clean_topic = re.sub(r"\\s+", " ", TOPIC).strip()
-    title = clean_topic[:67].rstrip(" -,:;") 
-    if not title:
-        title = "Interesting Facts You Should Know"
-    if not title.lower().endswith("#shorts") and len(title) <= 60:
-        title = f"{title} #Shorts"
-
-    # Derive useful search phrases from the configured topic without another
-    # paid/free-tier model call. Keep the phrases short for stock-video APIs.
-    topic_words = re.findall(r"[A-Za-z0-9]+", clean_topic.lower())
-    stop_words = {"the", "and", "for", "with", "about", "from", "that", "this"}
-    keywords = [word for word in topic_words if word not in stop_words]
-    if not keywords:
-        keywords = ["interesting", "facts"]
-
-    query1 = " ".join(keywords[:5])[:70]
-    query2 = " ".join(keywords[:3] + ["space", "planet"])[:70]
-    queries = list(dict.fromkeys(q for q in (query1, query2, clean_topic) if q))
-
+    title = "Azərbaycanda İnsanlar Ən Çox Nəyə Pul Xərcləyir? | Statistika"
     description = (
-        f"{clean_topic}. Watch these quick, fascinating facts and discover "
-        "something new. Subscribe for more educational YouTube Shorts."
+        "Azərbaycanda insanlar ən çox nəyə pul xərcləyir? Bu videoda "
+        "ərzaq, kommunal xidmətlər, ev əşyaları, restoranlar və nəqliyyat "
+        "üzrə ev təsərrüfatlarının istehlak xərclərinə baxırıq. "
+        "Videoda göstərilən faizlər Azərbaycan Dövlət Statistika Komitəsinin "
+        "2023-cü il üzrə istehlak xərclərinin strukturuna dair məlumatlarına əsaslanır. "
+        "Bu göstəricilər ümumi gəlirin deyil, istehlak xərclərinin payını göstərir.\n\n"
+        "Rəsmi mənbə: https://www.stat.gov.az/menu/6/statistical_yearbooks/source/stat-yearbook_2024.pdf\n\n"
+        "Siz ən çox nəyə pul xərcləyirsiniz? Şərhlərdə yazın və yeni videolar üçün abunə olun!"
     )
-    tags = list(dict.fromkeys(
-        keywords[:8] + ["facts", "education", "science", "learning", "shorts"]
-    ))[:15]
-
-    print("Metadata generated locally; no additional Gemini request used.")
-    return title[:100], description, tags, queries[:3]
-
+    tags = [
+        "Azərbaycanda xərclər", "insanlar nəyə pul xərcləyir",
+        "ailə büdcəsi", "ərzaq xərcləri", "kommunal xərclər",
+        "Azərbaycan statistikası", "pul idarəetməsi", "qənaət",
+        "istehlak xərcləri", "maliyyə savadlılığı", "Azərbaycan",
+        "maraqlı faktlar", "YouTube Shorts"
+    ]
+    # English phrases improve the chance of finding relevant stock footage.
+    queries = [
+        "grocery shopping supermarket food",
+        "paying household utility bills home",
+        "family budget shopping transportation"
+    ]
+    print("Azerbaijani SEO metadata generated locally; no extra Gemini request used.")
+    return title[:100], description, tags[:15], queries
 
 def search_pexels(query):
     response = requests.get(
@@ -410,35 +407,27 @@ def collect_clips(queries, wanted=5):
 
 
 def create_voice_and_subtitles(script):
-    print("4. Generating Kokoro TTS voice and timed captions...")
+    print("4. Edge TTS ilə Azərbaycan dilində səs və subtitrlər hazırlanır...")
 
-    import numpy as np
-    import soundfile as sf
-    from kokoro import KPipeline
+    import asyncio
+    import edge_tts
 
     if not script.strip():
         raise RuntimeError("Cannot synthesize an empty script.")
 
-    # American English Kokoro voice; audio is generated locally by the model.
-    pipeline = KPipeline(lang_code="a")
-    audio_chunks = []
-    for graphemes, phonemes, audio in pipeline(
-        script,
-        voice=VOICE,
-        speed=1.0,
-        split_pattern=r"\n+",
-    ):
-        if audio is not None and len(audio):
-            audio_chunks.append(np.asarray(audio, dtype=np.float32))
+    async def synthesize():
+        communicate = edge_tts.Communicate(script, VOICE)
+        await communicate.save(str(AUDIO_FILE))
 
-    if not audio_chunks:
-        raise RuntimeError("Kokoro did not return any audio.")
-
-    audio_data = np.concatenate(audio_chunks)
-    sf.write(str(AUDIO_FILE), audio_data, 24000, subtype="PCM_16")
+    try:
+        asyncio.run(synthesize())
+    except Exception as exc:
+        raise RuntimeError(
+            f"Edge TTS səs yaradılması uğursuz oldu ({VOICE}): {exc}"
+        ) from exc
 
     if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
-        raise RuntimeError("Kokoro did not create an audio file.")
+        raise RuntimeError("Edge TTS did not create an audio file.")
 
     def stamp(seconds):
         ms = max(0, int(seconds * 1000))
@@ -447,9 +436,9 @@ def create_voice_and_subtitles(script):
         seconds, ms = divmod(ms, 1000)
         return f"{hours:02}:{minutes:02}:{seconds:02},{ms:03}"
 
-    # Kokoro returns audio chunks rather than word-level timestamps. Estimate
-    # word timings across the actual generated audio duration for readable captions.
-    words = re.findall(r"\S+", script)
+    # Edge TTS does not provide word-level timestamps here, so estimate
+    # subtitle timing proportionally across the generated audio duration.
+    words = re.findall(r"\\S+", script)
     if not words:
         raise RuntimeError("The generated script contains no words.")
 
@@ -500,8 +489,8 @@ def create_voice_and_subtitles(script):
             "",
         ])
 
-    SUBTITLE_FILE.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Kokoro voice generated ({VOICE}); estimated subtitle timings written.")
+    SUBTITLE_FILE.write_text("\\n".join(lines), encoding="utf-8")
+    print(f"Edge TTS voice generated ({VOICE}); estimated subtitle timings written.")
     return audio_duration
 
 def get_audio_duration():
@@ -645,7 +634,7 @@ def upload_video(title, description, tags, clips):
             "description": full_description[:5000],
             "tags": tags[:15],
             "categoryId": YOUTUBE_CATEGORY,
-            "defaultLanguage": "en",
+            "defaultLanguage": "az",
         },
         "status": {
             "privacyStatus": PRIVACY,
@@ -681,6 +670,7 @@ def main():
     print("========================================")
     print("Topic:", TOPIC)
     print("Gemini model:", MODEL)
+    print("TTS voice:", VOICE)
 
     check_configuration()
     script = generate_script(TOPIC)
