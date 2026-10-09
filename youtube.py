@@ -30,9 +30,9 @@ TOKEN_FILE = BASE / "token.json"
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
-MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip()
-TOPIC = os.getenv("VIDEO_TOPIC", "3 Amazing Facts About Space").strip()
-VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural").strip()
+MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-2.5-flash"
+TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "3 Amazing Facts About Space"
+VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or "en-US-AriaNeural"
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
 if PRIVACY not in {"public", "private", "unlisted"}:
