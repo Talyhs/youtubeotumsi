@@ -216,6 +216,32 @@ def generate_text(prompt):
         + str(last_error)
     ) from last_error
 
+def load_fallback_script():
+    """Load a bundled Azerbaijani script when Gemini quota or service is unavailable."""
+    fallback_path = BASE / "sample_script_10_facts_az.txt"
+    if not fallback_path.exists():
+        raise RuntimeError(
+            "Gemini əlçatan deyil və ehtiyat ssenari faylı tapılmadı: "
+            "sample_script_10_facts_az.txt"
+        )
+    script = fallback_path.read_text(encoding="utf-8").strip()
+    word_count = len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
+    if not 390 <= word_count <= 430:
+        raise RuntimeError(
+            f"Ehtiyat ssenarinin söz sayı uyğun deyil: {word_count}. "
+            "sample_script_10_facts_az.txt faylını yoxlayın."
+        )
+    print(
+        "WARNING: Gemini istifadə edilə bilmədi. "
+        "Repo daxilindəki hazır Azərbaycan dilində ehtiyat ssenari istifadə olunur."
+    )
+    return script
+
+
+def count_script_words(script):
+    return len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
+
+
 def generate_script(topic):
     print("1. Azərbaycan dilində 10 maraqlı fakt hazırlanır...")
 
@@ -237,26 +263,65 @@ Tələblər:
 - Sonda ən maraqlı faktı xatırladan qısa sual və təbii abunə çağırışı ver.
 - Başlıq, markdown, URL və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
 """
-    script = generate_text(prompt)
-    word_count = len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
+    try:
+        script = generate_text(prompt)
+    except Exception as exc:
+        print(f"Gemini ssenari yaratmadı: {exc}")
+        script = load_fallback_script()
+        # Metadata must describe the actual fallback rather than today's unrelated topic.
+        global TOPIC
+        TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
+
+    word_count = count_script_words(script)
+    # The original script may be just a few words outside the target. Do not make
+    # another expensive API request for a harmless deviation; audio is timed later.
     if not 390 <= word_count <= 430:
-        print(f"Generated script has {word_count} words; requesting one correction.")
-        correction_prompt = (
-            "Aşağıdakı Azərbaycan dilində ssenarini məzmununu və 10 faktını qoruyaraq "
-            "390-430 söz aralığına düzəlt. İlk 5 saniyənin girişini və son çağırışı saxla. "
-            "Yalnız ssenarini qaytar, əlavə izah yazma.\n\n" + script
-        )
-        script = generate_text(correction_prompt)
-    word_count = len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
-    if not 390 <= word_count <= 430:
+        if 360 <= word_count <= 450:
+            print(
+                f"Script has {word_count} words; keeping it to avoid an unnecessary "
+                "Gemini correction request. Final audio will be timed to the target."
+            )
+        else:
+            print(f"Generated script has {word_count} words; requesting one correction.")
+            correction_prompt = (
+                "Aşağıdakı Azərbaycan dilində ssenarini məzmununu və 10 faktını qoruyaraq "
+                "390-430 söz aralığına düzəlt. İlk 5 saniyənin girişini və son çağırışı saxla. "
+                "Yalnız ssenarini qaytar, əlavə izah yazma.\n\n" + script
+            )
+            try:
+                corrected = generate_text(correction_prompt)
+                corrected_count = count_script_words(corrected)
+                if 360 <= corrected_count <= 450:
+                    script = corrected
+                    word_count = corrected_count
+                else:
+                    print(
+                        f"Correction returned {corrected_count} words; "
+                        "using the bundled fallback script instead."
+                    )
+                    script = load_fallback_script()
+                    TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
+                    word_count = count_script_words(script)
+            except Exception as exc:
+                print(f"Gemini correction failed: {exc}")
+                if not 360 <= word_count <= 450:
+                    script = load_fallback_script()
+                    TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
+                    word_count = count_script_words(script)
+                else:
+                    print(
+                        f"Keeping the original {word_count}-word script; "
+                        "the correction call is optional."
+                    )
+
+    if not 360 <= word_count <= 450:
         raise RuntimeError(
-            f"Gemini ssenarisi {word_count} sözdür; tələb olunan aralıq 390-430 sözdür. "
-            "GEMINI_FALLBACK_MODELS ayarını yoxlayın və workflow-u yenidən başladın."
+            f"Ssenarinin söz sayı {word_count}-dir. "
+            "Nə Gemini mətni, nə də ehtiyat ssenari istifadə oluna bildi."
         )
     print(f"Script word count: {word_count}")
     print(script)
     return script
-
 
 def generate_metadata(script):
     """Build SEO title, description, tags and include the full spoken script."""
