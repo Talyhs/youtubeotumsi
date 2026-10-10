@@ -107,9 +107,6 @@ def run(command):
 def check_configuration():
     missing = []
 
-    if not GEMINI_KEY:
-        missing.append("GEMINI_API_KEY")
-
     if not os.getenv("TOKEN_JSON", "").strip():
         missing.append("TOKEN_JSON")
 
@@ -136,6 +133,7 @@ def check_configuration():
         )
 
     print("Configuration validated.")
+    print("Gemini enabled:", bool(GEMINI_KEY))
     print("Pexels enabled:", bool(PEXELS_KEY))
     print("Pixabay enabled:", bool(PIXABAY_KEY))
 
