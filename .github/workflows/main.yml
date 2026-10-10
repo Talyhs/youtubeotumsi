@@ -125,21 +125,23 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'upload' }}
         run: |
           python - <<'PY'
           import json
           import os
           import sys
-          required = ("TOKEN_JSON",)
+          required = ("TOKEN_JSON",) if os.environ.get("PUBLISH_MODE", "upload") == "upload" else ()
           missing = [name for name in required if not os.environ.get(name, "").strip()]
           if missing:
               raise SystemExit("Missing GitHub Secrets: " + ", ".join(missing))
           if not (os.environ.get("PEXELS_API_KEY", "").strip() or os.environ.get("PIXABAY_API_KEY", "").strip()):
               raise SystemExit("Add at least one GitHub Secret: PEXELS_API_KEY or PIXABAY_API_KEY")
-          token = json.loads(os.environ["TOKEN_JSON"])
-          if not token.get("refresh_token"):
-              raise SystemExit("TOKEN_JSON must contain a refresh_token.")
-          print("Required secrets and OAuth token validated.")
+          if os.environ.get("PUBLISH_MODE", "upload") == "upload":
+              token = json.loads(os.environ["TOKEN_JSON"])
+              if not token.get("refresh_token"):
+                  raise SystemExit("TOKEN_JSON must contain a refresh_token.")
+          print("Required secrets validated.")
           PY
 
       - name: Run YouTube automation
