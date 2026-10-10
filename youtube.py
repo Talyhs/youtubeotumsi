@@ -713,6 +713,28 @@ def make_video(clips, duration):
         raise RuntimeError("Final MP4 was not created.")
 
 
+def validate_final_video(expected_duration):
+    """Fail closed if the rendered MP4 has no usable video/audio or wrong duration."""
+    if not VIDEO_FILE.exists() or VIDEO_FILE.stat().st_size < 100_000:
+        raise RuntimeError("Final MP4 is missing or suspiciously small.")
+    raw = run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(VIDEO_FILE)])
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("ffprobe returned invalid JSON for the final MP4.") from exc
+    streams = data.get("streams", [])
+    video = next((item for item in streams if item.get("codec_type") == "video"), None)
+    audio = next((item for item in streams if item.get("codec_type") == "audio"), None)
+    if not video or not audio:
+        raise RuntimeError("Quality check failed: final MP4 must contain both video and audio streams.")
+    actual = float((data.get("format") or {}).get("duration", 0) or 0)
+    if actual <= 0 or abs(actual - float(expected_duration)) > 3.0:
+        raise RuntimeError(f"Quality check failed: duration {actual:.2f}s differs from target {expected_duration:.2f}s.")
+    expected = (1080, 1920) if VIDEO_FORMAT == "vertical" else (1920, 1080)
+    actual_size = (int(video.get("width", 0)), int(video.get("height", 0)))
+    if actual_size != expected:
+        raise RuntimeError(f"Quality check failed: expected {expected[0]}x{expected[1]}, got {actual_size[0]}x{actual_size[1]}.")
+    print(f"Quality check passed: {actual_size[0]}x{actual_size[1]}, {actual:.1f}s, video+audio streams present.")
 def create_thumbnail(title):
     """Create a basic branded 1280x720 thumbnail with Pillow."""
     from PIL import Image, ImageDraw, ImageFont
@@ -867,6 +889,7 @@ def main():
     clips = collect_clips(queries, wanted=5)
     duration = create_voice_and_subtitles(script)
     make_video(clips, duration)
+    validate_final_video(duration)
     if CREATE_THUMBNAIL:
         create_thumbnail(title)
     if PUBLISH_MODE == "upload":
