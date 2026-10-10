@@ -130,15 +130,16 @@ def check_configuration():
     run(["ffmpeg", "-version"])
     run(["ffprobe", "-version"])
 
-    try:
-        token = json.loads(os.environ["TOKEN_JSON"])
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("TOKEN_JSON is not valid JSON.") from exc
+    if PUBLISH_MODE == "upload":
+        try:
+            oauth_data = json.loads(os.environ["TOKEN_JSON"])
+        except (json.JSONDecodeError, KeyError) as exc:
+            raise RuntimeError("TOKEN_JSON is not valid JSON.") from exc
 
-    if not token.get("refresh_token"):
-        raise RuntimeError(
-            "TOKEN_JSON must contain a valid OAuth refresh_token."
-        )
+        if not oauth_data.get("refresh_token"):
+            raise RuntimeError(
+                "TOKEN_JSON must contain a valid OAuth refresh_token."
+            )
 
     print("Configuration validated.")
     print("Gemini enabled:", bool(GEMINI_KEY))
