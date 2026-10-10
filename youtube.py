@@ -249,123 +249,76 @@ def count_script_words(script):
 
 
 def generate_script(topic):
-    print("1. Azərbaycan dilində 10 maraqlı fakt hazırlanır...")
-
+    language_names = {"az": "Azerbaijani", "en": "English", "tr": "Turkish"}
+    language_name = language_names.get(LANGUAGE, "Azerbaijani")
+    target_seconds = max(30, int(os.getenv("TARGET_VIDEO_SECONDS", "193")))
+    target_words = max(55, int(target_seconds * 2.05))
+    min_words = max(45, int(target_words * 0.88))
+    max_words = int(target_words * 1.12)
+    print(f"1. Generating {language_name} script for: {topic}")
     prompt = f"""
-Azərbaycan dilində YouTube videosu üçün təbii səslənən ssenari yaz.
-Mövzu: {topic}
-
-Tələblər:
-- Dəqiq 10 fərqli və mümkün qədər etibarlı, həqiqətə uyğun fakt təqdim et.
-- Mətn 390-430 Azərbaycan sözü olsun; videonun hədəf müddəti 3 dəqiqə 13 saniyədir.
-- Təbii danışıq dili, qısa cümlələr və səsli oxunuş üçün rahat ritm istifadə et.
-- İlk 5 saniyədə güclü maraq oyadan sual və ya təəccüblü ziddiyyət yarat; cavabı dərhal açma.
-- Giriş 1-2 cümlə olsun, uzadılmış salamlaşma yazma.
-- Hər faktı "1-ci fakt", "2-ci fakt" formasında başlat; hər faktın ilk cümləsi maraq oyatsın.
-- Faktlar arasında qısa, təbii keçidlər və açıq suallar istifadə et ki, tamaşaçı növbəti faktı gözləsin.
-- 3-cü və 7-ci faktlardan əvvəl marağı artıran keçid ver, cavabı həmin faktın içində aç.
-- Faktlar qısa, konkret, bir-birindən fərqli olsun. Uydurma rəqəmlər, saxta sitatlar və sübut olunmamış iddialar yazma.
-- Təxminən hər 20-30 saniyədə yeni maraq elementi olsun; ritm sürətli qalsın.
-- Sonda ən maraqlı faktı xatırladan qısa sual və təbii abunə çağırışı ver.
-- Başlıq, markdown, URL və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
+Write a natural spoken YouTube narration in {language_name}.
+Topic: {topic}
+Target duration: {target_seconds} seconds. Aim for {min_words}-{max_words} words.
+Use an engaging opening, accurate facts, short natural sentences, and a concise ending.
+Do not invent statistics, citations or unsupported claims.
+Return only the narration, without markdown, title, URL or stage directions.
 """
     try:
         script = generate_text(prompt)
     except Exception as exc:
-        print(f"Gemini ssenari yaratmadı: {exc}")
-        script = load_fallback_script()
-        # Metadata must describe the actual fallback rather than today's unrelated topic.
-        global TOPIC
-        TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
-
-    word_count = count_script_words(script)
-    # The original script may be just a few words outside the target. Do not make
-    # another expensive API request for a harmless deviation; audio is timed later.
-    if not 390 <= word_count <= 430:
-        if 360 <= word_count <= 450:
-            print(
-                f"Script has {word_count} words; keeping it to avoid an unnecessary "
-                "Gemini correction request. Final audio will be timed to the target."
-            )
+        print(f"Gemini script generation failed: {exc}")
+        if LANGUAGE == "az" and 150 <= target_seconds <= 220:
+            script = load_fallback_script()
+            global TOPIC
+            TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
         else:
-            print(f"Generated script has {word_count} words; requesting one correction.")
-            correction_prompt = (
-                "Aşağıdakı Azərbaycan dilində ssenarini məzmununu və 10 faktını qoruyaraq "
-                "390-430 söz aralığına düzəlt. İlk 5 saniyənin girişini və son çağırışı saxla. "
-                "Yalnız ssenarini qaytar, əlavə izah yazma.\n\n" + script
-            )
-            try:
-                corrected = generate_text(correction_prompt)
-                corrected_count = count_script_words(corrected)
-                if 360 <= corrected_count <= 450:
-                    script = corrected
-                    word_count = corrected_count
-                else:
-                    print(
-                        f"Correction returned {corrected_count} words; "
-                        "using the bundled fallback script instead."
-                    )
-                    script = load_fallback_script()
-                    TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
-                    word_count = count_script_words(script)
-            except Exception as exc:
-                print(f"Gemini correction failed: {exc}")
-                if not 360 <= word_count <= 450:
-                    script = load_fallback_script()
-                    TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
-                    word_count = count_script_words(script)
-                else:
-                    print(
-                        f"Keeping the original {word_count}-word script; "
-                        "the correction call is optional."
-                    )
-
-    if not 360 <= word_count <= 450:
-        raise RuntimeError(
-            f"Ssenarinin söz sayı {word_count}-dir. "
-            "Nə Gemini mətni, nə də ehtiyat ssenari istifadə oluna bildi."
-        )
+            raise RuntimeError("Gemini əlçatan deyil və bu dil/müddət üçün ehtiyat ssenari yoxdur.") from exc
+    word_count = count_script_words(script)
+    if not min_words <= word_count <= max_words:
+        try:
+            correction = f"Revise this {language_name} narration to {min_words}-{max_words} words. Preserve factual accuracy and return only narration text:\\n\\n{script}"
+            corrected = generate_text(correction)
+            corrected_count = count_script_words(corrected)
+            if min_words * 0.8 <= corrected_count <= max_words * 1.2:
+                script, word_count = corrected, corrected_count
+            elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
+                script = load_fallback_script()
+                word_count = count_script_words(script)
+            else:
+                raise RuntimeError(f"Script length {corrected_count} is outside the target range.")
+        except Exception as exc:
+            if LANGUAGE == "az" and 150 <= target_seconds <= 220:
+                print(f"Correction unavailable, using bundled fallback: {exc}")
+                script = load_fallback_script()
+                word_count = count_script_words(script)
+            else:
+                raise
+    if not int(min_words * 0.65) <= word_count <= int(max_words * 1.35):
+        raise RuntimeError(f"Script has {word_count} words; target is approximately {min_words}-{max_words}.")
     print(f"Script word count: {word_count}")
     print(script)
     return script
 
 def generate_metadata(script):
-    """Build SEO title, description, tags and include the full spoken script."""
-    print("2. Azərbaycan dilində SEO başlığı, açıqlama və etiketlər hazırlanır...")
-
-    topic = TOPIC.strip() or "maraqlı faktlar"
-    title = f"10 Maraqlı Fakt: {topic}"[:100].rstrip(" -,:;|")
-    topic_words = re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())
-    topic_words = [word for word in topic_words if word not in {
-        "haqqında", "barədə", "və", "olan", "üçün"
-    }]
-    keywords = list(dict.fromkeys(topic_words + [
-        "10 maraqlı fakt", "maraqlı məlumatlar", "Azərbaycan dilində",
-        "elm", "öyrən", "faktlar"
-    ]))
-    tags = keywords[:15]
-
-    hashtags = ["#MaraqlıFaktlar", "#Azərbaycan", "#Elm"]
-    if topic_words:
-        topic_hashtag = "#" + "".join(
-            word[:1].upper() + word[1:] for word in topic_words[:2]
-        )
-        if topic_hashtag not in hashtags:
-            hashtags.insert(0, topic_hashtag)
-    hashtags = hashtags[:4]
-
-    description = (
-        f"{topic.capitalize()} mövzusunda 10 maraqlı fakt! "
-        f"Bu videoda {', '.join(topic_words[:4]) if topic_words else 'maraqlı mövzular'} "
-        "haqqında qısa, maarifləndirici məlumatlar öyrənəcəksiniz. "
-        "Yeni faktlar və biliklər üçün videonu sonadək izləyin, fikrinizi şərhdə yazın "
-        "və kanala abunə olun.\n\n"
-        "VİDEODA SƏSLƏNƏN MƏTN:\n"
-        + script.strip()
-        + "\n\n"
-        + " ".join(hashtags)
-    )
-    print("SEO metadata and full narration text generated locally.")
+    """Create language-aware SEO metadata and save it for review."""
+    topic = TOPIC.strip() or "interesting facts"
+    topic_words = list(dict.fromkeys(re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())))
+    if LANGUAGE == "en":
+        title = f"10 Interesting Facts: {topic}"[:100]
+        description = f"Discover interesting facts about {topic}. Watch to the end and share your thoughts.\\n\\nNARRATION:\\n{script.strip()}\\n\\n#Facts #Learning #Science"
+        tags = (topic_words + ["interesting facts", "educational", "science", "learn"])[:15]
+    elif LANGUAGE == "tr":
+        title = f"10 İlginç Bilgi: {topic}"[:100]
+        description = f"{topic} hakkında ilginç bilgiler. Sonuna kadar izleyin ve düşüncelerinizi yorumlarda paylaşın.\\n\\nVİDEO METNİ:\\n{script.strip()}\\n\\n#İlginçBilgiler #Bilim #Öğren"
+        tags = (topic_words + ["ilginç bilgiler", "eğitim", "bilim", "öğren"])[:15]
+    else:
+        title = f"10 Maraqlı Fakt: {topic}"[:100]
+        description = f"{topic} haqqında maraqlı faktlar. Videonu sonadək izləyin və fikrinizi şərhdə yazın.\\n\\nVİDEODA SƏSLƏNƏN MƏTN:\\n{script.strip()}\\n\\n#MaraqlıFaktlar #Azərbaycan #Elm"
+        tags = (topic_words + ["10 maraqlı fakt", "maraqlı məlumatlar", "elm", "öyrən"])[:15]
+    metadata = {"title": title, "description": description[:4900], "tags": tags, "language": LANGUAGE, "topic": topic}
+    (WORK / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    print("SEO metadata saved to work/metadata.json")
     return title, description[:4900], tags, []
 
 def search_pexels(query):
