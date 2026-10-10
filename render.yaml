@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: talyhs-youtube-studio
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    healthCheckPath: /
+    envVars:
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: GH_TOKEN
+        sync: false
+      - key: GITHUB_REPOSITORY
+        value: Talyhs/youtubeotumsi
+      - key: GITHUB_WORKFLOW_FILE
+        value: main.yml
