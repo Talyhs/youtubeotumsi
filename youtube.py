@@ -32,7 +32,15 @@ PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
 TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "10 maraqlı fakt"
-VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or "az-AZ-BabekNeural"
+LANGUAGE = os.getenv("VIDEO_LANGUAGE", "az").strip().lower()
+VOICE_GENDER = os.getenv("VOICE_GENDER", "auto").strip().lower()
+VOICE_MAP = {"az": {"auto": "az-AZ-BabekNeural", "male": "az-AZ-BabekNeural", "female": "az-AZ-BanuNeural"}, "en": {"auto": "en-US-GuyNeural", "male": "en-US-GuyNeural", "female": "en-US-JennyNeural"}, "tr": {"auto": "tr-TR-AhmetNeural", "male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"}}
+VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"]).get(VOICE_GENDER, VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"])["auto"])
+VIDEO_FORMAT = os.getenv("VIDEO_FORMAT", "horizontal").strip().lower()
+ADD_SUBTITLES = os.getenv("ADD_SUBTITLES", "true").strip().lower() == "true"
+CREATE_THUMBNAIL = os.getenv("CREATE_THUMBNAIL", "true").strip().lower() == "true"
+PUBLISH_MODE = os.getenv("PUBLISH_MODE", "upload").strip().lower()
+STOCK_SOURCES = {item.strip().lower() for item in os.getenv("STOCK_SOURCES", "Pixabay,Pexels").split(",") if item.strip()}
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
 if PRIVACY not in {"public", "private", "unlisted"}:
@@ -107,7 +115,7 @@ def run(command):
 def check_configuration():
     missing = []
 
-    if not os.getenv("TOKEN_JSON", "").strip():
+    if PUBLISH_MODE == "upload" and not os.getenv("TOKEN_JSON", "").strip():
         missing.append("TOKEN_JSON")
 
     if not (PEXELS_KEY or PIXABAY_KEY):
@@ -751,6 +759,40 @@ def make_video(clips, duration):
         raise RuntimeError("Final MP4 was not created.")
 
 
+def create_thumbnail(title):
+    """Create a basic branded 1280x720 thumbnail with Pillow."""
+    from PIL import Image, ImageDraw, ImageFont
+    output = WORK / "thumbnail.jpg"
+    image = Image.new("RGB", (1280, 720), (14, 22, 40))
+    draw = ImageDraw.Draw(image)
+    for i in range(12):
+        x = i * 125 - 180
+        draw.polygon([(x, 0), (x + 260, 0), (x + 520, 720), (x + 260, 720)], fill=(22 + i % 3 * 5, 47 + i % 4 * 4, 78 + i % 5 * 4))
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 68)
+        small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)
+    except OSError:
+        font = small = ImageFont.load_default()
+    words = title[:64].split()
+    lines, current = [], ""
+    for word in words:
+        candidate = (current + " " + word).strip()
+        if draw.textbbox((0, 0), candidate, font=font)[2] > 1060 and current:
+            lines.append(current); current = word
+        else:
+            current = candidate
+    if current: lines.append(current)
+    y = max(80, (720 - min(len(lines), 4) * 86) // 2)
+    for line in lines[:4]:
+        draw.text((72, y + 5), line, font=font, fill=(0, 0, 0))
+        draw.text((68, y), line, font=font, fill=(255, 255, 255), stroke_width=2, stroke_fill=(10, 18, 30))
+        y += 86
+    draw.rounded_rectangle((68, 620, 390, 675), radius=14, fill=(255, 197, 44))
+    draw.text((88, 634), "TALYHS STUDIO", font=small, fill=(14, 22, 40))
+    image.save(output, "JPEG", quality=92, optimize=True)
+    print("Thumbnail created:", output)
+
+
 def build_credits(clips):
     lines = [
         "",
@@ -853,8 +895,14 @@ def main():
     print(" TALYHS / YOUTUBE AUTOMATION")
     print("========================================")
     global TOPIC
-    TOPIC, stock_queries = get_daily_topic()
+    requested_topic = os.getenv("VIDEO_TOPIC", "").strip()
+    if requested_topic:
+        TOPIC = requested_topic
+        stock_queries = [requested_topic, requested_topic + " nature", requested_topic + " science"]
+    else:
+        TOPIC, stock_queries = get_daily_topic()
     print("Topic:", TOPIC)
+    print("Language:", LANGUAGE, "Format:", VIDEO_FORMAT, "Publish mode:", PUBLISH_MODE)
     print("Gemini model:", MODEL)
     print("TTS voice:", VOICE)
 
@@ -865,7 +913,21 @@ def main():
     clips = collect_clips(queries, wanted=5)
     duration = create_voice_and_subtitles(script)
     make_video(clips, duration)
-    upload_video(title, description, tags, clips)
+    if CREATE_THUMBNAIL:
+        create_thumbnail(title)
+    if PUBLISH_MODE == "upload":
+        video_id = upload_video(title, description, tags, clips)
+        if CREATE_THUMBNAIL:
+            try:
+                youtube = get_youtube_service()
+                youtube.thumbnails().set(videoId=video_id, media_body=MediaFileUpload(str(WORK / "thumbnail.jpg"), mimetype="image/jpeg")).execute()
+                print("Custom thumbnail uploaded.")
+            except Exception as exc:
+                print("Thumbnail upload failed; video remains uploaded:", exc)
+    else:
+        print("PUBLISH_MODE=prepare: MP4 was rendered but not uploaded.")
+    print("Final title:", title)
+    print("SEO metadata:", WORK / "metadata.json")
 
     print("Final MP4:", VIDEO_FILE)
     print("Subtitles:", SUBTITLE_FILE)
