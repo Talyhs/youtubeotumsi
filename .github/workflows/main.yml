@@ -1,6 +1,12 @@
 name: Daily Azerbaijani Facts Video
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "youtube.py"
+      - "sample_script_10_facts_az.txt"
+      - ".github/workflows/main.yml"
   schedule:
     - cron: "0 9 * * *"
       timezone: "Asia/Baku"
@@ -53,7 +59,8 @@ jobs:
           import json
           import os
 
-          required = ("GEMINI_API_KEY", "TOKEN_JSON")
+          # Gemini is optional: youtube.py falls back to the bundled Azerbaijani script.
+          required = ("TOKEN_JSON",)
           missing = [
               name for name in required
               if not os.environ.get(name, "").strip()
@@ -79,6 +86,7 @@ jobs:
               raise SystemExit("TOKEN_JSON must contain a refresh_token.")
 
           print("Required secrets and OAuth token validated.")
+          print("Gemini enabled:", bool(os.environ.get("GEMINI_API_KEY", "").strip()))
           print("Pexels enabled:", bool(os.environ.get("PEXELS_API_KEY", "").strip()))
           print("Pixabay enabled:", bool(os.environ.get("PIXABAY_API_KEY", "").strip()))
           PY
