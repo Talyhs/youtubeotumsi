@@ -434,10 +434,12 @@ def collect_clips(queries, wanted=5):
     providers = []
 
     if PEXELS_KEY:
-        providers.append(search_pexels)
+        if "pexels" in STOCK_SOURCES or not STOCK_SOURCES:
+            providers.append(search_pexels)
 
     if PIXABAY_KEY:
-        providers.append(search_pixabay)
+        if "pixabay" in STOCK_SOURCES or not STOCK_SOURCES:
+            providers.append(search_pixabay)
 
     if not providers:
         raise RuntimeError(
@@ -606,8 +608,8 @@ def create_voice_and_subtitles(script):
     ass_lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
-        "PlayResX: 1920",
-        "PlayResY: 1080",
+        "PlayResX: " + ("1080" if VIDEO_FORMAT == "vertical" else "1920"),
+        "PlayResY: " + ("1920" if VIDEO_FORMAT == "vertical" else "1080"),
         "WrapStyle: 2",
         "ScaledBorderAndShadow: yes",
         "",
@@ -669,8 +671,7 @@ def make_video(clips, duration):
             "-stream_loop", "-1", "-i", str(clip["file"]),
             "-t", f"{length:.3f}",
             "-vf",
-            "scale=1920:1080:force_original_aspect_ratio=increase,"
-            "crop=1920:1080,fps=30,setsar=1",
+            (("scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920") if VIDEO_FORMAT == "vertical" else ("scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080")) + ",fps=30,setsar=1",
             "-an",
             "-c:v", "libx264",
             "-preset", "veryfast",
@@ -691,7 +692,7 @@ def make_video(clips, duration):
     subtitle_path = subtitle_path.replace("\\", r"\\").replace(":", r"\:")
     subtitle_path = subtitle_path.replace("'", r"\'")
 
-    filter_arg = f"subtitles='{subtitle_path}'"
+    filter_arg = f"subtitles='{subtitle_path}'" if ADD_SUBTITLES else "null"
 
     run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -813,7 +814,7 @@ def upload_video(title, description, tags, clips):
             "description": full_description[:5000],
             "tags": tags[:15],
             "categoryId": YOUTUBE_CATEGORY,
-            "defaultLanguage": "az",
+            "defaultLanguage": LANGUAGE if LANGUAGE in {"az", "en", "tr"} else "az",
         },
         "status": {
             "privacyStatus": PRIVACY,
