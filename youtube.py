@@ -277,7 +277,7 @@ Return only the narration, without markdown, title, URL or stage directions.
     word_count = count_script_words(script)
     if not min_words <= word_count <= max_words:
         try:
-            correction = f"Revise this {language_name} narration to {min_words}-{max_words} words. Preserve factual accuracy and return only narration text:\\n\\n{script}"
+            correction = f"Revise this {language_name} narration to {min_words}-{max_words} words. Preserve factual accuracy and return only narration text:\n\n{script}"
             corrected = generate_text(correction)
             corrected_count = count_script_words(corrected)
             if min_words * 0.8 <= corrected_count <= max_words * 1.2:
@@ -306,15 +306,15 @@ def generate_metadata(script):
     topic_words = list(dict.fromkeys(re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())))
     if LANGUAGE == "en":
         title = f"10 Interesting Facts: {topic}"[:100]
-        description = f"Discover interesting facts about {topic}. Watch to the end and share your thoughts.\\n\\nNARRATION:\\n{script.strip()}\\n\\n#Facts #Learning #Science"
+        description = f"Discover interesting facts about {topic}. Watch to the end and share your thoughts.\n\nNARRATION:\n{script.strip()}\n\n#Facts #Learning #Science"
         tags = (topic_words + ["interesting facts", "educational", "science", "learn"])[:15]
     elif LANGUAGE == "tr":
         title = f"10 İlginç Bilgi: {topic}"[:100]
-        description = f"{topic} hakkında ilginç bilgiler. Sonuna kadar izleyin ve düşüncelerinizi yorumlarda paylaşın.\\n\\nVİDEO METNİ:\\n{script.strip()}\\n\\n#İlginçBilgiler #Bilim #Öğren"
+        description = f"{topic} hakkında ilginç bilgiler. Sonuna kadar izleyin ve düşüncelerinizi yorumlarda paylaşın.\n\nVİDEO METNİ:\n{script.strip()}\n\n#İlginçBilgiler #Bilim #Öğren"
         tags = (topic_words + ["ilginç bilgiler", "eğitim", "bilim", "öğren"])[:15]
     else:
         title = f"10 Maraqlı Fakt: {topic}"[:100]
-        description = f"{topic} haqqında maraqlı faktlar. Videonu sonadək izləyin və fikrinizi şərhdə yazın.\\n\\nVİDEODA SƏSLƏNƏN MƏTN:\\n{script.strip()}\\n\\n#MaraqlıFaktlar #Azərbaycan #Elm"
+        description = f"{topic} haqqında maraqlı faktlar. Videonu sonadək izləyin və fikrinizi şərhdə yazın.\n\nVİDEODA SƏSLƏNƏN MƏTN:\n{script.strip()}\n\n#MaraqlıFaktlar #Azərbaycan #Elm"
         tags = (topic_words + ["10 maraqlı fakt", "maraqlı məlumatlar", "elm", "öyrən"])[:15]
     metadata = {"title": title, "description": description[:4900], "tags": tags, "language": LANGUAGE, "topic": topic}
     (WORK / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
