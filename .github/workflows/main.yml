@@ -120,6 +120,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Python syntax
+        run: python -m py_compile youtube.py
+
       - name: Validate required secrets
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
