@@ -509,64 +509,122 @@ def collect_clips(queries, wanted=5):
 
 
 def create_voice_and_subtitles(script):
-    print("4. Edge TTS ilə Azərbaycan dilində səs və diqqətçəkən subtitrlər hazırlanır...")
-
+    """Generate narration with ElevenLabs when configured, otherwise Edge TTS."""
     import asyncio
     import edge_tts
 
     if not script.strip():
         raise RuntimeError("Cannot synthesize an empty script.")
 
-    async def synthesize():
-        communicate = edge_tts.Communicate(script, VOICE, rate="+0%")
-        await communicate.save(str(AUDIO_FILE))
+    provider = os.getenv("VOICE_PROVIDER", "auto").strip().lower()
+    eleven_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+    eleven_voice_id = os.getenv("ELEVENLABS_VOICE_ID", "").strip()
+    eleven_model = os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3").strip() or "eleven_v3"
 
-    try:
-        asyncio.run(synthesize())
-    except Exception as exc:
+    if provider not in {"auto", "elevenlabs", "edge"}:
+        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs or edge.")
+
+    use_elevenlabs = provider == "elevenlabs" or (
+        provider == "auto" and bool(eleven_key and eleven_voice_id)
+    )
+    if provider == "elevenlabs" and not (eleven_key and eleven_voice_id):
         raise RuntimeError(
-            f"Edge TTS səs yaradılması uğursuz oldu ({VOICE}): {exc}"
-        ) from exc
-
-    if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
-        raise RuntimeError("Edge TTS did not create an audio file.")
-
-    # Aim for 3:13. atempo adjusts playback speed without changing pitch.
-    target_duration = float(os.getenv("TARGET_VIDEO_SECONDS", "193"))
-    original_duration = get_audio_duration()
-    tempo = original_duration / target_duration
-    if not 0.25 <= tempo <= 4.0:
+            "ElevenLabs seçilib, amma ELEVENLABS_API_KEY və/və ya "
+            "ELEVENLABS_VOICE_ID GitHub Secrets-də yoxdur."
+        )
+    if bool(eleven_key) != bool(eleven_voice_id):
         raise RuntimeError(
-            f"Səsləndirmə müddəti ({original_duration:.1f}s) 3:13 hədəfindən "
-            "həddindən artıq fərqlənir. Ssenarinin söz sayını və Edge TTS səsini yoxlayın."
+            "ElevenLabs konfiqurasiyası natamamdır: ELEVENLABS_API_KEY və "
+            "ELEVENLABS_VOICE_ID birlikdə verilməlidir."
         )
 
-    # FFmpeg atempo filters are chained so each factor stays within 0.5-2.0.
-    # This supports realistic narration speeds without unnecessarily rejecting
-    # scripts that naturally render a little faster or slower.
-    tempo_factors = []
-    remaining_tempo = tempo
-    while remaining_tempo < 0.5:
-        tempo_factors.append(0.5)
-        remaining_tempo /= 0.5
-    while remaining_tempo > 2.0:
-        tempo_factors.append(2.0)
-        remaining_tempo /= 2.0
-    tempo_factors.append(remaining_tempo)
-    tempo_filter = ",".join(f"atempo={factor:.6f}" for factor in tempo_factors)
+    if use_elevenlabs:
+        print(f"4. ElevenLabs ilə yüksək keyfiyyətli səsləndirmə hazırlanır (model: {eleven_model})...")
+        response = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{eleven_voice_id}",
+            headers={
+                "xi-api-key": eleven_key,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+            },
+            params={"output_format": "mp3_44100_128"},
+            json={
+                "text": script,
+                "model_id": eleven_model,
+                "voice_settings": {
+                    "stability": 0.50,
+                    "similarity_boost": 0.78,
+                    "style": 0.20,
+                    "use_speaker_boost": True
+                }
+            },
+            timeout=(20, 240),
+        )
+        if not response.ok:
+            # Avoid logging request headers or credentials.
+            detail = response.text[:1200]
+            raise RuntimeError(
+                f"ElevenLabs API xətası (HTTP {response.status_code}): {detail}"
+            )
+        AUDIO_FILE.write_bytes(response.content)
+        if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size < 1000:
+            raise RuntimeError("ElevenLabs boş və ya yararsız audio qaytardı.")
+        original_duration = get_audio_duration()
+        audio_duration = original_duration
+        print(
+            f"ElevenLabs səsi hazırdır: {audio_duration:.1f} saniyə. "
+            "Təbii tələffüzü qorumaq üçün səs sürətləndirilmir."
+        )
+    else:
+        print(f"4. Edge TTS ilə səsləndirmə hazırlanır ({VOICE})...")
+        async def synthesize():
+            communicate = edge_tts.Communicate(script, VOICE, rate="+0%")
+            await communicate.save(str(AUDIO_FILE))
 
-    adjusted_audio = WORK / "voiceover_adjusted.mp3"
-    run([
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-i", str(AUDIO_FILE),
-        "-filter:a", tempo_filter,
-        "-t", f"{target_duration:.3f}",
-        "-codec:a", "libmp3lame", "-q:a", "3",
-        str(adjusted_audio),
-    ])
-    adjusted_audio.replace(AUDIO_FILE)
-    audio_duration = get_audio_duration()
-    print(f"Səsin hədəf müddəti: {audio_duration:.1f} saniyə.")
+        try:
+            asyncio.run(synthesize())
+        except Exception as exc:
+            raise RuntimeError(
+                f"Edge TTS səs yaradılması uğursuz oldu ({VOICE}): {exc}"
+            ) from exc
+
+        if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
+            raise RuntimeError("Edge TTS did not create an audio file.")
+
+        # Keep legacy Edge TTS duration fitting; ElevenLabs audio is never time-stretched.
+        target_duration = float(os.getenv("TARGET_VIDEO_SECONDS", "193"))
+        original_duration = get_audio_duration()
+        tempo = original_duration / target_duration
+        if not 0.25 <= tempo <= 4.0:
+            raise RuntimeError(
+                f"Səsləndirmə müddəti ({original_duration:.1f}s) hədəf müddətdən "
+                "həddindən artıq fərqlənir. Ssenarinin söz sayını yoxlayın."
+            )
+
+        tempo_factors = []
+        remaining_tempo = tempo
+        while remaining_tempo < 0.5:
+            tempo_factors.append(0.5)
+            remaining_tempo /= 0.5
+        while remaining_tempo > 2.0:
+            tempo_factors.append(2.0)
+            remaining_tempo /= 2.0
+        tempo_factors.append(remaining_tempo)
+        tempo_filter = ",".join(f"atempo={factor:.6f}" for factor in tempo_factors)
+
+        adjusted_audio = WORK / "voiceover_adjusted.mp3"
+        run([
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(AUDIO_FILE),
+            "-filter:a", tempo_filter,
+            "-t", f"{target_duration:.3f}",
+            "-codec:a", "libmp3lame", "-q:a", "3",
+            str(adjusted_audio),
+        ])
+        adjusted_audio.replace(AUDIO_FILE)
+        audio_duration = get_audio_duration()
+        print(f"Edge TTS səs müddəti: {audio_duration:.1f} saniyə.")
+
 
     def ass_stamp(seconds):
         cs = max(0, int(seconds * 100))
