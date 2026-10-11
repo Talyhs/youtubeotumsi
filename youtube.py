@@ -801,31 +801,126 @@ def validate_final_video(expected_duration):
         raise RuntimeError(f"Quality check failed: expected {expected[0]}x{expected[1]}, got {actual_size[0]}x{actual_size[1]}.")
     print(f"Quality check passed: {actual_size[0]}x{actual_size[1]}, {actual:.1f}s, video+audio streams present.")
 def create_thumbnail(title):
-    """Create a basic branded 1280x720 thumbnail with Pillow."""
+    """Generate a topic-specific thumbnail with AUTOMATIC1111 when configured."""
+    import base64
+    from io import BytesIO
     from PIL import Image, ImageDraw, ImageFont
+
     output = WORK / "thumbnail.jpg"
-    image = Image.new("RGB", (1280, 720), (14, 22, 40))
+    width, height = 1280, 720
+    sd_url = os.getenv("SD_WEBUI_URL", "").strip().rstrip("/")
+    sd_username = os.getenv("SD_WEBUI_USERNAME", "").strip()
+    sd_password = os.getenv("SD_WEBUI_PASSWORD", "").strip()
+    topic = TOPIC.strip() or title
+
+    def load_fonts():
+        try:
+            return (
+                ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 68),
+                ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26),
+            )
+        except OSError:
+            fallback = ImageFont.load_default()
+            return fallback, fallback
+
+    image = None
+    if sd_url:
+        print("Generating thumbnail background with AUTOMATIC1111 Stable Diffusion WebUI...")
+        prompt = (
+            f"Create a premium, cinematic YouTube thumbnail background about: {topic}. "
+            "Landscape 16:9 composition, photorealistic, dramatic studio lighting, "
+            "high contrast, rich deep navy and teal colors with warm golden highlights, "
+            "one clear visually striking subject related to the topic positioned on the "
+            "right half, clean dark negative space on the left for a large title overlay, "
+            "professional editorial photography, crisp details, polished composition. "
+            "No text, no letters, no words, no logos, no watermark, no collage, no border."
+        )
+        negative_prompt = (
+            "text, typography, letters, words, watermark, logo, signature, blurry, "
+            "low resolution, deformed, distorted, duplicate subject, cluttered layout, "
+            "oversaturated, artifacts, frame, border"
+        )
+        payload = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "width": width,
+            "height": height,
+            "steps": int(os.getenv("SD_WEBUI_STEPS", "25")),
+            "cfg_scale": 7,
+            "sampler_name": os.getenv("SD_WEBUI_SAMPLER", "DPM++ 2M Karras"),
+            "batch_size": 1,
+            "n_iter": 1,
+            "restore_faces": False,
+            "send_images": True,
+            "save_images": False,
+        }
+        try:
+            response = requests.post(
+                f"{sd_url}/sdapi/v1/txt2img",
+                json=payload,
+                auth=(sd_username, sd_password) if sd_username or sd_password else None,
+                timeout=(20, 300),
+            )
+            response.raise_for_status()
+            result = response.json()
+            images = result.get("images") or []
+            if not images:
+                raise RuntimeError("AUTOMATIC1111 returned no images.")
+            encoded = images[0].split(",", 1)[-1]
+            generated = Image.open(BytesIO(base64.b64decode(encoded))).convert("RGB")
+            # Keep the composition exactly 16:9 for YouTube thumbnails.
+            generated = generated.resize((width, height), Image.Resampling.LANCZOS)
+            image = generated
+            print("AUTOMATIC1111 background generated successfully.")
+        except Exception as exc:
+            if os.getenv("SD_WEBUI_REQUIRED", "false").strip().lower() == "true":
+                raise RuntimeError(
+                    "AUTOMATIC1111 thumbnail generation failed and SD_WEBUI_REQUIRED=true. "
+                    "Check SD_WEBUI_URL, API access, credentials, model and available VRAM. "
+                    f"Original error: {exc}"
+                ) from exc
+            print(f"WARNING: AUTOMATIC1111 unavailable; using branded Pillow fallback: {exc}")
+
+    if image is None:
+        image = Image.new("RGB", (width, height), (14, 22, 40))
+        draw = ImageDraw.Draw(image)
+        for i in range(12):
+            x = i * 125 - 180
+            draw.polygon(
+                [(x, 0), (x + 260, 0), (x + 520, height), (x + 260, height)],
+                fill=(22 + i % 3 * 5, 47 + i % 4 * 4, 78 + i % 5 * 4),
+            )
+
+    # Add the title in Pillow, since diffusion models are unreliable at rendering text.
     draw = ImageDraw.Draw(image)
-    for i in range(12):
-        x = i * 125 - 180
-        draw.polygon([(x, 0), (x + 260, 0), (x + 520, 720), (x + 260, 720)], fill=(22 + i % 3 * 5, 47 + i % 4 * 4, 78 + i % 5 * 4))
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 68)
-        small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)
-    except OSError:
-        font = small = ImageFont.load_default()
+    font, small = load_fonts()
     words = title[:64].split()
     lines, current = [], ""
     for word in words:
         candidate = (current + " " + word).strip()
-        if draw.textbbox((0, 0), candidate, font=font)[2] > 1060 and current:
-            lines.append(current); current = word
+        if draw.textbbox((0, 0), candidate, font=font)[2] > 700 and current:
+            lines.append(current)
+            current = word
         else:
             current = candidate
-    if current: lines.append(current)
-    y = max(80, (720 - min(len(lines), 4) * 86) // 2)
+    if current:
+        lines.append(current)
+
+    # Darken the left side to preserve readable contrast over any generated image.
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    from PIL import Image as PILImage
+    shade = PILImage.new("RGBA", (width, height), (0, 0, 0, 0))
+    shade_pixels = shade.load()
+    for x in range(0, 820):
+        alpha = int(165 * (1 - x / 820))
+        for y in range(height):
+            shade_pixels[x, y] = (5, 10, 22, alpha)
+    image = Image.alpha_composite(image.convert("RGBA"), shade).convert("RGB")
+    draw = ImageDraw.Draw(image)
+
+    y = max(70, (height - min(len(lines), 4) * 86) // 2)
     for line in lines[:4]:
-        draw.text((72, y + 5), line, font=font, fill=(0, 0, 0))
+        draw.text((72, y + 5), line, font=font, fill=(0, 0, 0), stroke_width=3, stroke_fill=(0, 0, 0))
         draw.text((68, y), line, font=font, fill=(255, 255, 255), stroke_width=2, stroke_fill=(10, 18, 30))
         y += 86
     draw.rounded_rectangle((68, 620, 390, 675), radius=14, fill=(255, 197, 44))
