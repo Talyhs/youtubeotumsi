@@ -115,6 +115,9 @@ def run(command):
 def check_configuration():
     missing = []
 
+    if not GEMINI_KEY:
+        missing.append("GEMINI_API_KEY")
+
     if PUBLISH_MODE == "upload" and not os.getenv("TOKEN_JSON", "").strip():
         missing.append("TOKEN_JSON")
 
