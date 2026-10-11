@@ -15,3 +15,30 @@ services:
         value: Talyhs/youtubeotumsi
       - key: GITHUB_WORKFLOW_FILE
         value: main.yml
+
+  - type: web
+    name: talyhs-whatsapp-control
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn whatsapp_bot:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /health
+    envVars:
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: WHATSAPP_ALLOWED_PHONE
+        sync: false
+      - key: GH_TOKEN
+        sync: false
+      - key: GITHUB_REPOSITORY
+        value: Talyhs/youtubeotumsi
+      - key: GITHUB_WORKFLOW_FILE
+        value: main.yml
+      - key: WHATSAPP_GRAPH_VERSION
+        value: v23.0
