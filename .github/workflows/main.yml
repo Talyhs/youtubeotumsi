@@ -109,9 +109,10 @@ jobs:
       - name: Install FFmpeg and subtitle fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
+          sudo apt-get install -y ffmpeg melt fonts-dejavu-core espeak-ng
           ffmpeg -version
           ffprobe -version
+          melt -version
           ffmpeg -filters 2>/dev/null | grep subtitles
 
       - name: Install Python dependencies
