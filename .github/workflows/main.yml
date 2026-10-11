@@ -154,6 +154,11 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          SD_WEBUI_URL: ${{ secrets.SD_WEBUI_URL }}
+          SD_WEBUI_USERNAME: ${{ secrets.SD_WEBUI_USERNAME }}
+          SD_WEBUI_PASSWORD: ${{ secrets.SD_WEBUI_PASSWORD }}
+          SD_WEBUI_REQUIRED: ${{ secrets.SD_WEBUI_REQUIRED }}
+          SD_WEBUI_STEPS: "25"
           GEMINI_TEXT_MODEL: gemini-3.8-flash
           PYTHONUNBUFFERED: "1"
         run: python youtube.py
