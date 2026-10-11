@@ -660,59 +660,118 @@ def get_audio_duration():
 
 
 def make_video(clips, duration):
-    print("5. Editing stock footage, voice and subtitles...")
-    scene_duration = duration / len(clips)
+    """Build a normalized timeline with MLT (Shotcut's engine), then mux narration/subtitles."""
+    import shutil
+    import xml.etree.ElementTree as ET
+
+    if not clips:
+        raise RuntimeError("Cannot render a video without stock clips.")
+
+    print("5. Editing stock footage with the MLT engine used by Shotcut...")
+    scene_duration = float(duration) / len(clips)
+    width, height = (1080, 1920) if VIDEO_FORMAT == "vertical" else (1920, 1080)
+    fps = 30
     normalized = []
 
     for index, clip in enumerate(clips):
         output = WORK / f"scene_{index:02}.mp4"
-        length = scene_duration
         run([
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-stream_loop", "-1", "-i", str(clip["file"]),
-            "-t", f"{length:.3f}",
+            "-t", f"{scene_duration:.3f}",
             "-vf",
-            (("scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920") if VIDEO_FORMAT == "vertical" else ("scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080")) + ",fps=30,setsar=1",
-            "-an",
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps},setsar=1",
+            "-an", "-c:v", "libx264", "-preset", "veryfast",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(output),
         ])
         normalized.append(output)
 
-    concat_file = WORK / "concat.txt"
-    concat_file.write_text(
-        "".join(f"file '{p.resolve().as_posix()}'\n" for p in normalized),
-        encoding="utf-8",
-    )
+    montage_file = WORK / "mlt_montage.mp4"
+    melt = shutil.which("melt")
+    if melt:
+        # MLT XML describes a real edit timeline: each normalized stock clip is a
+        # separate producer placed consecutively on one playlist, as in Shotcut.
+        profile = ET.Element("profile", {
+            "description": "Talyhs Studio HD timeline",
+            "width": str(width), "height": str(height), "progressive": "1",
+            "frame_rate_num": str(fps), "frame_rate_den": "1",
+            "sample_aspect_num": "1", "sample_aspect_den": "1",
+            "display_aspect_num": str(width), "display_aspect_den": str(height),
+            "colorspace": "709",
+        })
+        root = ET.Element("mlt", {"LC_NUMERIC": "C", "version": "7.0.0", "title": "Talyhs Studio automatic edit"})
+        root.append(profile)
+        playlist = ET.SubElement(root, "playlist", {"id": "playlist0"})
+        total_frames = 0
+        for index, scene in enumerate(normalized):
+            producer_id = f"producer{index}"
+            out_frame = max(0, int(round(scene_duration * fps)) - 1)
+            producer = ET.SubElement(root, "producer", {
+                "id": producer_id, "in": "0", "out": str(out_frame),
+            })
+            ET.SubElement(producer, "property", {"name": "resource"}).text = str(scene.resolve())
+            ET.SubElement(producer, "property", {"name": "mlt_service"}).text = "avformat"
+            ET.SubElement(producer, "property", {"name": "audio_index"}).text = "-1"
+            ET.SubElement(playlist, "entry", {
+                "producer": producer_id, "in": "0", "out": str(out_frame),
+            })
+            total_frames += out_frame + 1
 
-    # Quote the subtitle path safely for FFmpeg's filter syntax.
+        timeline_file = WORK / "shotcut_mlt_timeline.mlt"
+        ET.ElementTree(root).write(timeline_file, encoding="utf-8", xml_declaration=True)
+        print(f"MLT timeline created: {timeline_file} ({len(normalized)} clips, {total_frames} frames)")
+        try:
+            run([
+                melt, str(timeline_file),
+                "-consumer", f"avformat:{montage_file}",
+                "vcodec=libx264", "crf=21", "preset=veryfast",
+                "pix_fmt=yuv420p", "real_time=-1",
+            ])
+        except Exception as exc:
+            raise RuntimeError(
+                "MLT (Shotcut engine) could not render the timeline. "
+                "Check the MLT installation and runner logs. Original error: " + str(exc)
+            ) from exc
+    else:
+        # Keep the pipeline usable on local machines without MLT; GitHub Actions
+        # installs melt and therefore uses the MLT/Shotcut timeline above.
+        print("WARNING: 'melt' was not found; using the FFmpeg concat fallback.")
+        concat_file = WORK / "concat.txt"
+        concat_file.write_text(
+            "".join(f"file '{p.resolve().as_posix()}'\n" for p in normalized),
+            encoding="utf-8",
+        )
+        run([
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "concat", "-safe", "0", "-i", str(concat_file),
+            "-an", "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "21", "-pix_fmt", "yuv420p", "-r", str(fps),
+            "-movflags", "+faststart", str(montage_file),
+        ])
+
+    if not montage_file.exists() or montage_file.stat().st_size == 0:
+        raise RuntimeError("MLT/FFmpeg did not create the montage MP4.")
+
+    # Burn the existing ASS subtitles after the MLT montage and add Edge-TTS audio.
     subtitle_path = SUBTITLE_FILE.resolve().as_posix()
     subtitle_path = subtitle_path.replace("\\", r"\\").replace(":", r"\:")
     subtitle_path = subtitle_path.replace("'", r"\'")
-
     filter_arg = f"subtitles='{subtitle_path}'" if ADD_SUBTITLES else "null"
 
     run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-f", "concat", "-safe", "0", "-i", str(concat_file),
-        "-i", str(AUDIO_FILE),
+        "-i", str(montage_file), "-i", str(AUDIO_FILE),
         "-vf", filter_arg,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-t", f"{duration:.3f}",
-        "-r", "30",
-        "-c:v", "libx264", "-preset", "medium",
-        "-crf", "21", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-shortest", "-movflags", "+faststart",
-        str(VIDEO_FILE),
+        "-t", f"{float(duration):.3f}", "-r", str(fps),
+        "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+        "-shortest", "-movflags", "+faststart", str(VIDEO_FILE),
     ])
 
     if not VIDEO_FILE.exists() or VIDEO_FILE.stat().st_size == 0:
         raise RuntimeError("Final MP4 was not created.")
-
 
 def validate_final_video(expected_duration):
     """Fail closed if the rendered MP4 has no usable video/audio or wrong duration."""
