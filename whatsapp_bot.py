@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import os
 import re
+import threading
 from datetime import datetime, timezone
 
 import requests
@@ -20,6 +21,11 @@ REPO = os.getenv("GITHUB_REPOSITORY", "Talyhs/youtubeotumsi").strip()
 WORKFLOW = os.getenv("GITHUB_WORKFLOW_FILE", "main.yml").strip()
 GITHUB_API = "https://api.github.com"
 SESSION = requests.Session()
+RECENT_MESSAGE_IDS = set()
+MESSAGE_IDS_LOCK = threading.Lock()
+MAX_REMEMBERED_MESSAGE_IDS = 2000
+LATEST_REQUEST_AT = None
+LATEST_REQUEST_TOPIC = None
 
 
 def configured():
@@ -63,6 +69,7 @@ def github_headers():
 
 
 def dispatch_prepare(topic):
+    global LATEST_REQUEST_AT, LATEST_REQUEST_TOPIC
     if not GH_TOKEN:
         raise RuntimeError("GitHub tokeni konfiqurasiya edilməyib.")
     url = f"{GITHUB_API}/repos/{REPO}/actions/workflows/{WORKFLOW}/dispatches"
@@ -79,6 +86,8 @@ def dispatch_prepare(topic):
         "privacy": "private",
         "publish": "prepare",
     }
+    LATEST_REQUEST_AT = datetime.now(timezone.utc)
+    LATEST_REQUEST_TOPIC = topic[:180]
     response = SESSION.post(
         url, headers=github_headers(), json={"ref": "main", "inputs": inputs}, timeout=20
     )
@@ -91,13 +100,26 @@ def dispatch_prepare(topic):
 def latest_run_summary():
     url = f"{GITHUB_API}/repos/{REPO}/actions/workflows/{WORKFLOW}/runs"
     response = SESSION.get(
-        url, headers=github_headers(), params={"per_page": 1}, timeout=20
+        url, headers=github_headers(), params={"per_page": 10, "event": "workflow_dispatch"}, timeout=20
     )
     response.raise_for_status()
     runs = response.json().get("workflow_runs", [])
     if not runs:
-        return "Hələ GitHub Actions icrası tapılmayıb."
+        return "Hələ əl ilə başladılmış GitHub Actions icrası tapılmayıb."
     run = runs[0]
+    if LATEST_REQUEST_AT is not None:
+        matching = []
+        for candidate in runs:
+            try:
+                created_at = datetime.fromisoformat(candidate.get("created_at", "").replace("Z", "+00:00"))
+                if created_at >= LATEST_REQUEST_AT:
+                    matching.append(candidate)
+            except (ValueError, TypeError):
+                continue
+        if matching:
+            run = matching[0]
+        else:
+            return "Son WhatsApp əmri: " + (LATEST_REQUEST_TOPIC or "mövzu") + "\nGitHub icrası hələ görünmür. Bir az sonra yenidən “status” yaz."
     status = run.get("status", "unknown")
     conclusion = run.get("conclusion") or "davam edir"
     return (
@@ -163,7 +185,20 @@ def handle_message(sender, body):
 
 @app.get("/health")
 def health():
-    return jsonify({"ok": True, "service": "whatsapp-control"}), 200
+    checks = {
+        "WHATSAPP_TOKEN": bool(WHATSAPP_TOKEN),
+        "WHATSAPP_PHONE_NUMBER_ID": bool(PHONE_NUMBER_ID),
+        "WHATSAPP_VERIFY_TOKEN": bool(VERIFY_TOKEN),
+        "META_APP_SECRET": bool(APP_SECRET),
+        "WHATSAPP_ALLOWED_PHONE": bool(ALLOWED_PHONE),
+        "GH_TOKEN": bool(GH_TOKEN),
+    }
+    return jsonify({
+        "ok": True,
+        "service": "whatsapp-control",
+        "configured": all(checks.values()),
+        "missing_settings": [key for key, present in checks.items() if not present],
+    }), 200
 
 
 @app.get("/webhook")
@@ -189,6 +224,15 @@ def receive_webhook():
             for change in entry.get("changes", []):
                 value = change.get("value", {})
                 for message in value.get("messages", []):
+                    message_id = str(message.get("id", ""))
+                    if message_id:
+                        with MESSAGE_IDS_LOCK:
+                            if message_id in RECENT_MESSAGE_IDS:
+                                continue
+                            RECENT_MESSAGE_IDS.add(message_id)
+                            if len(RECENT_MESSAGE_IDS) > MAX_REMEMBERED_MESSAGE_IDS:
+                                RECENT_MESSAGE_IDS.clear()
+                                RECENT_MESSAGE_IDS.add(message_id)
                     sender = str(message.get("from", ""))
                     if message.get("type") != "text":
                         send_text(sender, "Zəhmət olmasa, əmri mətn şəklində göndər.")
