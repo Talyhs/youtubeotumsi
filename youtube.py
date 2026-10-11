@@ -32,7 +32,15 @@ PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
 TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "10 maraqlı fakt"
-VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or "az-AZ-BabekNeural"
+LANGUAGE = os.getenv("VIDEO_LANGUAGE", "az").strip().lower()
+VOICE_GENDER = os.getenv("VOICE_GENDER", "auto").strip().lower()
+VOICE_MAP = {"az": {"auto": "az-AZ-BabekNeural", "male": "az-AZ-BabekNeural", "female": "az-AZ-BanuNeural"}, "en": {"auto": "en-US-GuyNeural", "male": "en-US-GuyNeural", "female": "en-US-JennyNeural"}, "tr": {"auto": "tr-TR-AhmetNeural", "male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"}}
+VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"]).get(VOICE_GENDER, VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"])["auto"])
+VIDEO_FORMAT = os.getenv("VIDEO_FORMAT", "horizontal").strip().lower()
+ADD_SUBTITLES = os.getenv("ADD_SUBTITLES", "true").strip().lower() == "true"
+CREATE_THUMBNAIL = os.getenv("CREATE_THUMBNAIL", "true").strip().lower() == "true"
+PUBLISH_MODE = os.getenv("PUBLISH_MODE", "upload").strip().lower()
+STOCK_SOURCES = {item.strip().lower() for item in os.getenv("STOCK_SOURCES", "Pixabay,Pexels").split(",") if item.strip()}
 PRIVACY = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").strip().lower()
 
 if PRIVACY not in {"public", "private", "unlisted"}:
@@ -107,7 +115,7 @@ def run(command):
 def check_configuration():
     missing = []
 
-    if not os.getenv("TOKEN_JSON", "").strip():
+    if PUBLISH_MODE == "upload" and not os.getenv("TOKEN_JSON", "").strip():
         missing.append("TOKEN_JSON")
 
     if not (PEXELS_KEY or PIXABAY_KEY):
@@ -122,15 +130,16 @@ def check_configuration():
     run(["ffmpeg", "-version"])
     run(["ffprobe", "-version"])
 
-    try:
-        token = json.loads(os.environ["TOKEN_JSON"])
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("TOKEN_JSON is not valid JSON.") from exc
+    if PUBLISH_MODE == "upload":
+        try:
+            oauth_data = json.loads(os.environ["TOKEN_JSON"])
+        except (json.JSONDecodeError, KeyError) as exc:
+            raise RuntimeError("TOKEN_JSON is not valid JSON.") from exc
 
-    if not token.get("refresh_token"):
-        raise RuntimeError(
-            "TOKEN_JSON must contain a valid OAuth refresh_token."
-        )
+        if not oauth_data.get("refresh_token"):
+            raise RuntimeError(
+                "TOKEN_JSON must contain a valid OAuth refresh_token."
+            )
 
     print("Configuration validated.")
     print("Gemini enabled:", bool(GEMINI_KEY))
@@ -241,123 +250,76 @@ def count_script_words(script):
 
 
 def generate_script(topic):
-    print("1. Azərbaycan dilində 10 maraqlı fakt hazırlanır...")
-
+    language_names = {"az": "Azerbaijani", "en": "English", "tr": "Turkish"}
+    language_name = language_names.get(LANGUAGE, "Azerbaijani")
+    target_seconds = max(30, int(os.getenv("TARGET_VIDEO_SECONDS", "193")))
+    target_words = max(55, int(target_seconds * 2.05))
+    min_words = max(45, int(target_words * 0.88))
+    max_words = int(target_words * 1.12)
+    print(f"1. Generating {language_name} script for: {topic}")
     prompt = f"""
-Azərbaycan dilində YouTube videosu üçün təbii səslənən ssenari yaz.
-Mövzu: {topic}
-
-Tələblər:
-- Dəqiq 10 fərqli və mümkün qədər etibarlı, həqiqətə uyğun fakt təqdim et.
-- Mətn 390-430 Azərbaycan sözü olsun; videonun hədəf müddəti 3 dəqiqə 13 saniyədir.
-- Təbii danışıq dili, qısa cümlələr və səsli oxunuş üçün rahat ritm istifadə et.
-- İlk 5 saniyədə güclü maraq oyadan sual və ya təəccüblü ziddiyyət yarat; cavabı dərhal açma.
-- Giriş 1-2 cümlə olsun, uzadılmış salamlaşma yazma.
-- Hər faktı "1-ci fakt", "2-ci fakt" formasında başlat; hər faktın ilk cümləsi maraq oyatsın.
-- Faktlar arasında qısa, təbii keçidlər və açıq suallar istifadə et ki, tamaşaçı növbəti faktı gözləsin.
-- 3-cü və 7-ci faktlardan əvvəl marağı artıran keçid ver, cavabı həmin faktın içində aç.
-- Faktlar qısa, konkret, bir-birindən fərqli olsun. Uydurma rəqəmlər, saxta sitatlar və sübut olunmamış iddialar yazma.
-- Təxminən hər 20-30 saniyədə yeni maraq elementi olsun; ritm sürətli qalsın.
-- Sonda ən maraqlı faktı xatırladan qısa sual və təbii abunə çağırışı ver.
-- Başlıq, markdown, URL və səhnə göstərişləri yazma; yalnız səsləndiriləcək mətni qaytar.
+Write a natural spoken YouTube narration in {language_name}.
+Topic: {topic}
+Target duration: {target_seconds} seconds. Aim for {min_words}-{max_words} words.
+Use an engaging opening, accurate facts, short natural sentences, and a concise ending.
+Do not invent statistics, citations or unsupported claims.
+Return only the narration, without markdown, title, URL or stage directions.
 """
     try:
         script = generate_text(prompt)
     except Exception as exc:
-        print(f"Gemini ssenari yaratmadı: {exc}")
-        script = load_fallback_script()
-        # Metadata must describe the actual fallback rather than today's unrelated topic.
-        global TOPIC
-        TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
-
-    word_count = count_script_words(script)
-    # The original script may be just a few words outside the target. Do not make
-    # another expensive API request for a harmless deviation; audio is timed later.
-    if not 390 <= word_count <= 430:
-        if 360 <= word_count <= 450:
-            print(
-                f"Script has {word_count} words; keeping it to avoid an unnecessary "
-                "Gemini correction request. Final audio will be timed to the target."
-            )
+        print(f"Gemini script generation failed: {exc}")
+        if LANGUAGE == "az" and 150 <= target_seconds <= 220:
+            script = load_fallback_script()
+            global TOPIC
+            TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
         else:
-            print(f"Generated script has {word_count} words; requesting one correction.")
-            correction_prompt = (
-                "Aşağıdakı Azərbaycan dilində ssenarini məzmununu və 10 faktını qoruyaraq "
-                "390-430 söz aralığına düzəlt. İlk 5 saniyənin girişini və son çağırışı saxla. "
-                "Yalnız ssenarini qaytar, əlavə izah yazma.\n\n" + script
-            )
-            try:
-                corrected = generate_text(correction_prompt)
-                corrected_count = count_script_words(corrected)
-                if 360 <= corrected_count <= 450:
-                    script = corrected
-                    word_count = corrected_count
-                else:
-                    print(
-                        f"Correction returned {corrected_count} words; "
-                        "using the bundled fallback script instead."
-                    )
-                    script = load_fallback_script()
-                    TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
-                    word_count = count_script_words(script)
-            except Exception as exc:
-                print(f"Gemini correction failed: {exc}")
-                if not 360 <= word_count <= 450:
-                    script = load_fallback_script()
-                    TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
-                    word_count = count_script_words(script)
-                else:
-                    print(
-                        f"Keeping the original {word_count}-word script; "
-                        "the correction call is optional."
-                    )
-
-    if not 360 <= word_count <= 450:
-        raise RuntimeError(
-            f"Ssenarinin söz sayı {word_count}-dir. "
-            "Nə Gemini mətni, nə də ehtiyat ssenari istifadə oluna bildi."
-        )
+            raise RuntimeError("Gemini əlçatan deyil və bu dil/müddət üçün ehtiyat ssenari yoxdur.") from exc
+    word_count = count_script_words(script)
+    if not min_words <= word_count <= max_words:
+        try:
+            correction = f"Revise this {language_name} narration to {min_words}-{max_words} words. Preserve factual accuracy and return only narration text:\n\n{script}"
+            corrected = generate_text(correction)
+            corrected_count = count_script_words(corrected)
+            if min_words * 0.8 <= corrected_count <= max_words * 1.2:
+                script, word_count = corrected, corrected_count
+            elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
+                script = load_fallback_script()
+                word_count = count_script_words(script)
+            else:
+                raise RuntimeError(f"Script length {corrected_count} is outside the target range.")
+        except Exception as exc:
+            if LANGUAGE == "az" and 150 <= target_seconds <= 220:
+                print(f"Correction unavailable, using bundled fallback: {exc}")
+                script = load_fallback_script()
+                word_count = count_script_words(script)
+            else:
+                raise
+    if not int(min_words * 0.65) <= word_count <= int(max_words * 1.35):
+        raise RuntimeError(f"Script has {word_count} words; target is approximately {min_words}-{max_words}.")
     print(f"Script word count: {word_count}")
     print(script)
     return script
 
 def generate_metadata(script):
-    """Build SEO title, description, tags and include the full spoken script."""
-    print("2. Azərbaycan dilində SEO başlığı, açıqlama və etiketlər hazırlanır...")
-
-    topic = TOPIC.strip() or "maraqlı faktlar"
-    title = f"10 Maraqlı Fakt: {topic}"[:100].rstrip(" -,:;|")
-    topic_words = re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())
-    topic_words = [word for word in topic_words if word not in {
-        "haqqında", "barədə", "və", "olan", "üçün"
-    }]
-    keywords = list(dict.fromkeys(topic_words + [
-        "10 maraqlı fakt", "maraqlı məlumatlar", "Azərbaycan dilində",
-        "elm", "öyrən", "faktlar"
-    ]))
-    tags = keywords[:15]
-
-    hashtags = ["#MaraqlıFaktlar", "#Azərbaycan", "#Elm"]
-    if topic_words:
-        topic_hashtag = "#" + "".join(
-            word[:1].upper() + word[1:] for word in topic_words[:2]
-        )
-        if topic_hashtag not in hashtags:
-            hashtags.insert(0, topic_hashtag)
-    hashtags = hashtags[:4]
-
-    description = (
-        f"{topic.capitalize()} mövzusunda 10 maraqlı fakt! "
-        f"Bu videoda {', '.join(topic_words[:4]) if topic_words else 'maraqlı mövzular'} "
-        "haqqında qısa, maarifləndirici məlumatlar öyrənəcəksiniz. "
-        "Yeni faktlar və biliklər üçün videonu sonadək izləyin, fikrinizi şərhdə yazın "
-        "və kanala abunə olun.\n\n"
-        "VİDEODA SƏSLƏNƏN MƏTN:\n"
-        + script.strip()
-        + "\n\n"
-        + " ".join(hashtags)
-    )
-    print("SEO metadata and full narration text generated locally.")
+    """Create language-aware SEO metadata and save it for review."""
+    topic = TOPIC.strip() or "interesting facts"
+    topic_words = list(dict.fromkeys(re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())))
+    if LANGUAGE == "en":
+        title = f"10 Interesting Facts: {topic}"[:100]
+        description = f"Discover interesting facts about {topic}. Watch to the end and share your thoughts.\n\nNARRATION:\n{script.strip()}\n\n#Facts #Learning #Science"
+        tags = (topic_words + ["interesting facts", "educational", "science", "learn"])[:15]
+    elif LANGUAGE == "tr":
+        title = f"10 İlginç Bilgi: {topic}"[:100]
+        description = f"{topic} hakkında ilginç bilgiler. Sonuna kadar izleyin ve düşüncelerinizi yorumlarda paylaşın.\n\nVİDEO METNİ:\n{script.strip()}\n\n#İlginçBilgiler #Bilim #Öğren"
+        tags = (topic_words + ["ilginç bilgiler", "eğitim", "bilim", "öğren"])[:15]
+    else:
+        title = f"10 Maraqlı Fakt: {topic}"[:100]
+        description = f"{topic} haqqında maraqlı faktlar. Videonu sonadək izləyin və fikrinizi şərhdə yazın.\n\nVİDEODA SƏSLƏNƏN MƏTN:\n{script.strip()}\n\n#MaraqlıFaktlar #Azərbaycan #Elm"
+        tags = (topic_words + ["10 maraqlı fakt", "maraqlı məlumatlar", "elm", "öyrən"])[:15]
+    metadata = {"title": title, "description": description[:4900], "tags": tags, "language": LANGUAGE, "topic": topic}
+    (WORK / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    print("SEO metadata saved to work/metadata.json")
     return title, description[:4900], tags, []
 
 def search_pexels(query):
@@ -473,10 +435,12 @@ def collect_clips(queries, wanted=5):
     providers = []
 
     if PEXELS_KEY:
-        providers.append(search_pexels)
+        if "pexels" in STOCK_SOURCES or not STOCK_SOURCES:
+            providers.append(search_pexels)
 
     if PIXABAY_KEY:
-        providers.append(search_pixabay)
+        if "pixabay" in STOCK_SOURCES or not STOCK_SOURCES:
+            providers.append(search_pixabay)
 
     if not providers:
         raise RuntimeError(
@@ -645,8 +609,8 @@ def create_voice_and_subtitles(script):
     ass_lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
-        "PlayResX: 1920",
-        "PlayResY: 1080",
+        "PlayResX: " + ("1080" if VIDEO_FORMAT == "vertical" else "1920"),
+        "PlayResY: " + ("1920" if VIDEO_FORMAT == "vertical" else "1080"),
         "WrapStyle: 2",
         "ScaledBorderAndShadow: yes",
         "",
@@ -696,59 +660,273 @@ def get_audio_duration():
 
 
 def make_video(clips, duration):
-    print("5. Editing stock footage, voice and subtitles...")
-    scene_duration = duration / len(clips)
+    """Build a normalized timeline with MLT (Shotcut's engine), then mux narration/subtitles."""
+    import shutil
+    import xml.etree.ElementTree as ET
+
+    if not clips:
+        raise RuntimeError("Cannot render a video without stock clips.")
+
+    print("5. Editing stock footage with the MLT engine used by Shotcut...")
+    scene_duration = float(duration) / len(clips)
+    width, height = (1080, 1920) if VIDEO_FORMAT == "vertical" else (1920, 1080)
+    fps = 30
     normalized = []
 
     for index, clip in enumerate(clips):
         output = WORK / f"scene_{index:02}.mp4"
-        length = scene_duration
         run([
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-stream_loop", "-1", "-i", str(clip["file"]),
-            "-t", f"{length:.3f}",
+            "-t", f"{scene_duration:.3f}",
             "-vf",
-            "scale=1920:1080:force_original_aspect_ratio=increase,"
-            "crop=1920:1080,fps=30,setsar=1",
-            "-an",
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps},setsar=1",
+            "-an", "-c:v", "libx264", "-preset", "veryfast",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(output),
         ])
         normalized.append(output)
 
-    concat_file = WORK / "concat.txt"
-    concat_file.write_text(
-        "".join(f"file '{p.resolve().as_posix()}'\n" for p in normalized),
-        encoding="utf-8",
-    )
+    montage_file = WORK / "mlt_montage.mp4"
+    melt = shutil.which("melt")
+    if melt:
+        # MLT XML describes a real edit timeline: each normalized stock clip is a
+        # separate producer placed consecutively on one playlist, as in Shotcut.
+        profile = ET.Element("profile", {
+            "description": "Talyhs Studio HD timeline",
+            "width": str(width), "height": str(height), "progressive": "1",
+            "frame_rate_num": str(fps), "frame_rate_den": "1",
+            "sample_aspect_num": "1", "sample_aspect_den": "1",
+            "display_aspect_num": str(width), "display_aspect_den": str(height),
+            "colorspace": "709",
+        })
+        root = ET.Element("mlt", {"LC_NUMERIC": "C", "version": "7.0.0", "title": "Talyhs Studio automatic edit"})
+        root.append(profile)
+        entries = []
+        total_frames = 0
+        for index, scene in enumerate(normalized):
+            producer_id = f"producer{index}"
+            out_frame = max(0, int(round(scene_duration * fps)) - 1)
+            producer = ET.SubElement(root, "producer", {
+                "id": producer_id, "in": "0", "out": str(out_frame),
+            })
+            ET.SubElement(producer, "property", {"name": "resource"}).text = str(scene.resolve())
+            ET.SubElement(producer, "property", {"name": "mlt_service"}).text = "avformat"
+            ET.SubElement(producer, "property", {"name": "audio_index"}).text = "-1"
+            entries.append({
+                "producer": producer_id, "in": "0", "out": str(out_frame),
+            })
+            total_frames += out_frame + 1
 
-    # Quote the subtitle path safely for FFmpeg's filter syntax.
+        # MLT producers must be declared before the playlist that references them.
+        playlist = ET.SubElement(root, "playlist", {"id": "playlist0"})
+        for entry_attrs in entries:
+            ET.SubElement(playlist, "entry", entry_attrs)
+
+        timeline_file = WORK / "shotcut_mlt_timeline.mlt"
+        ET.ElementTree(root).write(timeline_file, encoding="utf-8", xml_declaration=True)
+        print(f"MLT timeline created: {timeline_file} ({len(normalized)} clips, {total_frames} frames)")
+        try:
+            run([
+                melt, str(timeline_file),
+                "-consumer", f"avformat:{montage_file}",
+                "vcodec=libx264", "crf=21", "preset=veryfast",
+                "pix_fmt=yuv420p", "real_time=-1",
+            ])
+        except Exception as exc:
+            raise RuntimeError(
+                "MLT (Shotcut engine) could not render the timeline. "
+                "Check the MLT installation and runner logs. Original error: " + str(exc)
+            ) from exc
+    else:
+        # Keep the pipeline usable on local machines without MLT; GitHub Actions
+        # installs melt and therefore uses the MLT/Shotcut timeline above.
+        print("WARNING: 'melt' was not found; using the FFmpeg concat fallback.")
+        concat_file = WORK / "concat.txt"
+        concat_file.write_text(
+            "".join(f"file '{p.resolve().as_posix()}'\n" for p in normalized),
+            encoding="utf-8",
+        )
+        run([
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "concat", "-safe", "0", "-i", str(concat_file),
+            "-an", "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "21", "-pix_fmt", "yuv420p", "-r", str(fps),
+            "-movflags", "+faststart", str(montage_file),
+        ])
+
+    if not montage_file.exists() or montage_file.stat().st_size == 0:
+        raise RuntimeError("MLT/FFmpeg did not create the montage MP4.")
+
+    # Burn the existing ASS subtitles after the MLT montage and add Edge-TTS audio.
     subtitle_path = SUBTITLE_FILE.resolve().as_posix()
     subtitle_path = subtitle_path.replace("\\", r"\\").replace(":", r"\:")
     subtitle_path = subtitle_path.replace("'", r"\'")
-
-    filter_arg = f"subtitles='{subtitle_path}'"
+    filter_arg = f"subtitles='{subtitle_path}'" if ADD_SUBTITLES else "null"
 
     run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-f", "concat", "-safe", "0", "-i", str(concat_file),
-        "-i", str(AUDIO_FILE),
+        "-i", str(montage_file), "-i", str(AUDIO_FILE),
         "-vf", filter_arg,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-t", f"{duration:.3f}",
-        "-r", "30",
-        "-c:v", "libx264", "-preset", "medium",
-        "-crf", "21", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-shortest", "-movflags", "+faststart",
-        str(VIDEO_FILE),
+        "-t", f"{float(duration):.3f}", "-r", str(fps),
+        "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+        "-shortest", "-movflags", "+faststart", str(VIDEO_FILE),
     ])
 
     if not VIDEO_FILE.exists() or VIDEO_FILE.stat().st_size == 0:
         raise RuntimeError("Final MP4 was not created.")
+
+def validate_final_video(expected_duration):
+    """Fail closed if the rendered MP4 has no usable video/audio or wrong duration."""
+    if not VIDEO_FILE.exists() or VIDEO_FILE.stat().st_size < 100_000:
+        raise RuntimeError("Final MP4 is missing or suspiciously small.")
+    raw = run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(VIDEO_FILE)])
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("ffprobe returned invalid JSON for the final MP4.") from exc
+    streams = data.get("streams", [])
+    video = next((item for item in streams if item.get("codec_type") == "video"), None)
+    audio = next((item for item in streams if item.get("codec_type") == "audio"), None)
+    if not video or not audio:
+        raise RuntimeError("Quality check failed: final MP4 must contain both video and audio streams.")
+    actual = float((data.get("format") or {}).get("duration", 0) or 0)
+    if actual <= 0 or abs(actual - float(expected_duration)) > 3.0:
+        raise RuntimeError(f"Quality check failed: duration {actual:.2f}s differs from target {expected_duration:.2f}s.")
+    expected = (1080, 1920) if VIDEO_FORMAT == "vertical" else (1920, 1080)
+    actual_size = (int(video.get("width", 0)), int(video.get("height", 0)))
+    if actual_size != expected:
+        raise RuntimeError(f"Quality check failed: expected {expected[0]}x{expected[1]}, got {actual_size[0]}x{actual_size[1]}.")
+    print(f"Quality check passed: {actual_size[0]}x{actual_size[1]}, {actual:.1f}s, video+audio streams present.")
+def create_thumbnail(title):
+    """Generate a topic-specific thumbnail with AUTOMATIC1111 when configured."""
+    import base64
+    from io import BytesIO
+    from PIL import Image, ImageDraw, ImageFont
+
+    output = WORK / "thumbnail.jpg"
+    width, height = 1280, 720
+    sd_url = os.getenv("SD_WEBUI_URL", "").strip().rstrip("/")
+    sd_username = os.getenv("SD_WEBUI_USERNAME", "").strip()
+    sd_password = os.getenv("SD_WEBUI_PASSWORD", "").strip()
+    topic = TOPIC.strip() or title
+
+    def load_fonts():
+        try:
+            return (
+                ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 68),
+                ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26),
+            )
+        except OSError:
+            fallback = ImageFont.load_default()
+            return fallback, fallback
+
+    image = None
+    if sd_url:
+        print("Generating thumbnail background with AUTOMATIC1111 Stable Diffusion WebUI...")
+        prompt = (
+            f"Create a premium, cinematic YouTube thumbnail background about: {topic}. "
+            "Landscape 16:9 composition, photorealistic, dramatic studio lighting, "
+            "high contrast, rich deep navy and teal colors with warm golden highlights, "
+            "one clear visually striking subject related to the topic positioned on the "
+            "right half, clean dark negative space on the left for a large title overlay, "
+            "professional editorial photography, crisp details, polished composition. "
+            "No text, no letters, no words, no logos, no watermark, no collage, no border."
+        )
+        negative_prompt = (
+            "text, typography, letters, words, watermark, logo, signature, blurry, "
+            "low resolution, deformed, distorted, duplicate subject, cluttered layout, "
+            "oversaturated, artifacts, frame, border"
+        )
+        payload = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "width": width,
+            "height": height,
+            "steps": int(os.getenv("SD_WEBUI_STEPS", "25")),
+            "cfg_scale": 7,
+            "sampler_name": os.getenv("SD_WEBUI_SAMPLER", "DPM++ 2M Karras"),
+            "batch_size": 1,
+            "n_iter": 1,
+            "restore_faces": False,
+            "send_images": True,
+            "save_images": False,
+        }
+        try:
+            response = requests.post(
+                f"{sd_url}/sdapi/v1/txt2img",
+                json=payload,
+                auth=(sd_username, sd_password) if sd_username or sd_password else None,
+                timeout=(20, 300),
+            )
+            response.raise_for_status()
+            result = response.json()
+            images = result.get("images") or []
+            if not images:
+                raise RuntimeError("AUTOMATIC1111 returned no images.")
+            encoded = images[0].split(",", 1)[-1]
+            generated = Image.open(BytesIO(base64.b64decode(encoded))).convert("RGB")
+            # Keep the composition exactly 16:9 for YouTube thumbnails.
+            generated = generated.resize((width, height), Image.Resampling.LANCZOS)
+            image = generated
+            print("AUTOMATIC1111 background generated successfully.")
+        except Exception as exc:
+            if os.getenv("SD_WEBUI_REQUIRED", "false").strip().lower() == "true":
+                raise RuntimeError(
+                    "AUTOMATIC1111 thumbnail generation failed and SD_WEBUI_REQUIRED=true. "
+                    "Check SD_WEBUI_URL, API access, credentials, model and available VRAM. "
+                    f"Original error: {exc}"
+                ) from exc
+            print(f"WARNING: AUTOMATIC1111 unavailable; using branded Pillow fallback: {exc}")
+
+    if image is None:
+        image = Image.new("RGB", (width, height), (14, 22, 40))
+        draw = ImageDraw.Draw(image)
+        for i in range(12):
+            x = i * 125 - 180
+            draw.polygon(
+                [(x, 0), (x + 260, 0), (x + 520, height), (x + 260, height)],
+                fill=(22 + i % 3 * 5, 47 + i % 4 * 4, 78 + i % 5 * 4),
+            )
+
+    # Add the title in Pillow, since diffusion models are unreliable at rendering text.
+    draw = ImageDraw.Draw(image)
+    font, small = load_fonts()
+    words = title[:64].split()
+    lines, current = [], ""
+    for word in words:
+        candidate = (current + " " + word).strip()
+        if draw.textbbox((0, 0), candidate, font=font)[2] > 700 and current:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+
+    # Darken the left side to preserve readable contrast over any generated image.
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    from PIL import Image as PILImage
+    shade = PILImage.new("RGBA", (width, height), (0, 0, 0, 0))
+    shade_pixels = shade.load()
+    for x in range(0, 820):
+        alpha = int(165 * (1 - x / 820))
+        for y in range(height):
+            shade_pixels[x, y] = (5, 10, 22, alpha)
+    image = Image.alpha_composite(image.convert("RGBA"), shade).convert("RGB")
+    draw = ImageDraw.Draw(image)
+
+    y = max(70, (height - min(len(lines), 4) * 86) // 2)
+    for line in lines[:4]:
+        draw.text((72, y + 5), line, font=font, fill=(0, 0, 0), stroke_width=3, stroke_fill=(0, 0, 0))
+        draw.text((68, y), line, font=font, fill=(255, 255, 255), stroke_width=2, stroke_fill=(10, 18, 30))
+        y += 86
+    draw.rounded_rectangle((68, 620, 390, 675), radius=14, fill=(255, 197, 44))
+    draw.text((88, 634), "TALYHS STUDIO", font=small, fill=(14, 22, 40))
+    image.save(output, "JPEG", quality=92, optimize=True)
+    print("Thumbnail created:", output)
 
 
 def build_credits(clips):
@@ -818,7 +996,7 @@ def upload_video(title, description, tags, clips):
             "description": full_description[:5000],
             "tags": tags[:15],
             "categoryId": YOUTUBE_CATEGORY,
-            "defaultLanguage": "az",
+            "defaultLanguage": LANGUAGE if LANGUAGE in {"az", "en", "tr"} else "az",
         },
         "status": {
             "privacyStatus": PRIVACY,
@@ -853,8 +1031,14 @@ def main():
     print(" TALYHS / YOUTUBE AUTOMATION")
     print("========================================")
     global TOPIC
-    TOPIC, stock_queries = get_daily_topic()
+    requested_topic = os.getenv("VIDEO_TOPIC", "").strip()
+    if requested_topic:
+        TOPIC = requested_topic
+        stock_queries = [requested_topic, requested_topic + " nature", requested_topic + " science"]
+    else:
+        TOPIC, stock_queries = get_daily_topic()
     print("Topic:", TOPIC)
+    print("Language:", LANGUAGE, "Format:", VIDEO_FORMAT, "Publish mode:", PUBLISH_MODE)
     print("Gemini model:", MODEL)
     print("TTS voice:", VOICE)
 
@@ -865,7 +1049,22 @@ def main():
     clips = collect_clips(queries, wanted=5)
     duration = create_voice_and_subtitles(script)
     make_video(clips, duration)
-    upload_video(title, description, tags, clips)
+    validate_final_video(duration)
+    if CREATE_THUMBNAIL:
+        create_thumbnail(title)
+    if PUBLISH_MODE == "upload":
+        video_id = upload_video(title, description, tags, clips)
+        if CREATE_THUMBNAIL:
+            try:
+                youtube = get_youtube_service()
+                youtube.thumbnails().set(videoId=video_id, media_body=MediaFileUpload(str(WORK / "thumbnail.jpg"), mimetype="image/jpeg")).execute()
+                print("Custom thumbnail uploaded.")
+            except Exception as exc:
+                print("Thumbnail upload failed; video remains uploaded:", exc)
+    else:
+        print("PUBLISH_MODE=prepare: MP4 was rendered but not uploaded.")
+    print("Final title:", title)
+    print("SEO metadata:", WORK / "metadata.json")
 
     print("Final MP4:", VIDEO_FILE)
     print("Subtitles:", SUBTITLE_FILE)
