@@ -154,6 +154,10 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          ELEVENLABS_MODEL_ID: eleven_v3
+          VOICE_PROVIDER: auto
           SD_WEBUI_URL: ${{ secrets.SD_WEBUI_URL }}
           SD_WEBUI_USERNAME: ${{ secrets.SD_WEBUI_USERNAME }}
           SD_WEBUI_PASSWORD: ${{ secrets.SD_WEBUI_PASSWORD }}
