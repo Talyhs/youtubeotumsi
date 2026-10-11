@@ -702,7 +702,7 @@ def make_video(clips, duration):
         })
         root = ET.Element("mlt", {"LC_NUMERIC": "C", "version": "7.0.0", "title": "Talyhs Studio automatic edit"})
         root.append(profile)
-        playlist = ET.SubElement(root, "playlist", {"id": "playlist0"})
+        entries = []
         total_frames = 0
         for index, scene in enumerate(normalized):
             producer_id = f"producer{index}"
@@ -713,10 +713,15 @@ def make_video(clips, duration):
             ET.SubElement(producer, "property", {"name": "resource"}).text = str(scene.resolve())
             ET.SubElement(producer, "property", {"name": "mlt_service"}).text = "avformat"
             ET.SubElement(producer, "property", {"name": "audio_index"}).text = "-1"
-            ET.SubElement(playlist, "entry", {
+            entries.append({
                 "producer": producer_id, "in": "0", "out": str(out_frame),
             })
             total_frames += out_frame + 1
+
+        # MLT producers must be declared before the playlist that references them.
+        playlist = ET.SubElement(root, "playlist", {"id": "playlist0"})
+        for entry_attrs in entries:
+            ET.SubElement(playlist, "entry", entry_attrs)
 
         timeline_file = WORK / "shotcut_mlt_timeline.mlt"
         ET.ElementTree(root).write(timeline_file, encoding="utf-8", xml_declaration=True)
