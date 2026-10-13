@@ -85,8 +85,8 @@ jobs:
     env:
       VIDEO_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
       VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'az' }}
-      TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '193' }}
-      VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'horizontal' }}
+      TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
+      VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
       VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'auto' }}
       STOCK_SOURCES: ${{ github.event_name == 'workflow_dispatch' && inputs.stock_sources || 'Pixabay,Pexels' }}
       ADD_SUBTITLES: ${{ github.event_name == 'workflow_dispatch' && inputs.subtitles || 'true' }}
