@@ -4,6 +4,7 @@ import os
 import sys
 import subprocess
 import json
+import shutil
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal, Qt
 from PySide6.QtWidgets import (
@@ -18,7 +19,7 @@ from studio.media import master_video, align_words, make_thumbnail
 from studio.publish import upload_video
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 try:
     from dotenv import load_dotenv
     load_dotenv(ROOT / ".env")
@@ -64,7 +65,14 @@ class JobWorker(QThread):
                 env["SCRIPT_OVERRIDE_FILE"] = str(script_path)
                 set_step(job_id, "script", "done", "Ollama local")
             set_step(job_id, "engine", "running", "youtube.py")
-            proc = subprocess.Popen([sys.executable, str(ROOT / "youtube.py")], cwd=ROOT, env=env,
+            if getattr(sys, "frozen", False):
+                engine_exe = ROOT / "engine" / "TalyhsEngine.exe"
+                if not engine_exe.exists():
+                    raise RuntimeError("TalyhsEngine.exe not found in the engine folder. Rebuild using build_windows.bat.")
+                command = [str(engine_exe)]
+            else:
+                command = [sys.executable, str(ROOT / "youtube.py")]
+            proc = subprocess.Popen(command, cwd=ROOT, env=env,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                     encoding="utf-8", errors="replace", bufsize=1)
             for line in proc.stdout:
