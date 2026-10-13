@@ -88,11 +88,47 @@ DAILY_TOPICS = [
 ]
 
 def get_daily_topic():
-    """Pick a repeatable topic by day in Azerbaijan time."""
-    today = datetime.now(ZoneInfo("Asia/Baku")).date()
-    index = (today.timetuple().tm_yday - 1) % len(DAILY_TOPICS)
+    """Choose a repeatable, distinct daily topic for each scheduled slot in Baku time."""
+    now = datetime.now(ZoneInfo("Asia/Baku"))
+    day_index = now.timetuple().tm_yday - 1
+    slot_index = 0 if now.hour < 12 else 1 if now.hour < 17 else 2
+    index = (day_index * 3 + slot_index) % len(DAILY_TOPICS)
     topic, queries = DAILY_TOPICS[index]
-    print(f"Daily Azerbaijani topic ({today.isoformat()}): {topic}")
+    if LANGUAGE == "tr":
+        turkish_topics = [
+            "Uzay ve gezegenler hakkında şaşırtıcı gerçekler",
+            "Okyanusun derinliklerinden ilginç bilgiler",
+            "İnsan vücudu hakkında şaşırtıcı gerçekler",
+            "Hayvanlar dünyasının bilinmeyen sırları",
+            "Dünyanın doğal harikaları",
+            "Tarihten şaşırtıcı olaylar",
+            "Bilim ve fizik hakkında ilginç gerçekler",
+            "Yapay zekâ ve teknoloji hakkında bilgiler",
+            "Antik uygarlıkların gizemleri",
+            "Yiyecekler ve günlük yaşam hakkında bilimsel gerçekler",
+            "Uyku ve beynimiz hakkında ilginç bilgiler",
+            "Dünyanın en sıra dışı yerleri",
+            "İnsanlık tarihini değiştiren icatlar",
+            "Sayılar ve matematik hakkında şaşırtıcı gerçekler",
+            "Bitkiler ve ormanların gizli dünyası",
+            "Hava olayları ve iklim hakkında bilgiler",
+            "İnsan psikolojisinin şaşırtıcı yönleri",
+            "Günlük eşyaların bilinmeyen hikâyeleri",
+            "Dünya rekorları ve sıra dışı başarılar",
+            "Ünlü bilim insanları ve keşifleri",
+            "Güneş ve yıldızlar hakkında ilginç bilgiler",
+            "Kuşlar hakkında şaşırtıcı gerçekler",
+            "Böceklerin gizemli dünyası",
+            "İnsan duyguları nasıl çalışır?",
+            "Ulaşım ve otomobiller hakkında ilginç bilgiler",
+            "Dünya'nın jeolojisi ve volkanlar",
+            "Dünya kültürlerinden şaşırtıcı gelenekler",
+            "Deniz canlılarının bilinmeyen özellikleri",
+            "Işık ve optik hakkında ilginç deneyler",
+            "Günlük hayatta karşılaştığımız bilimsel gerçekler",
+        ]
+        topic = turkish_topics[index]
+    print(f"Daily topic ({now.isoformat()}): {topic}")
     return topic, queries
 
 
