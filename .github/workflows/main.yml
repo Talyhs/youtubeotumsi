@@ -63,13 +63,13 @@ on:
         required: true
         type: choice
         options: [private, unlisted, public]
-        default: private
+        default: public
       publish:
         description: "Yükləmə davranışı"
         required: true
         type: choice
         options: [prepare, upload]
-        default: prepare
+        default: upload
 
 permissions:
   contents: read
