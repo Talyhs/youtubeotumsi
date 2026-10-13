@@ -582,14 +582,41 @@ def create_voice_and_subtitles(script):
             await communicate.save(str(AUDIO_FILE))
 
         try:
-            asyncio.run(synthesize())
+            # Edge TTS may return HTTP 403 on hosted runners. Retry once, then
+            # use the locally installed espeak-ng engine so the scheduled job
+            # can still produce a video instead of failing before upload.
+            try:
+                asyncio.run(synthesize())
+            except Exception as edge_error:
+                print(
+                    f"WARNING: Edge TTS failed ({edge_error}). "
+                    "Trying local espeak-ng fallback."
+                )
+                wav_file = WORK / "voiceover_fallback.wav"
+                fallback_voice = "en-us" if LANGUAGE == "en" else "tr" if LANGUAGE == "tr" else "en"
+                run([
+                    "espeak-ng", "-v", fallback_voice, "-s", "145",
+                    "-w", str(wav_file), script
+                ])
+                if not wav_file.exists() or wav_file.stat().st_size < 1000:
+                    raise RuntimeError("espeak-ng did not create a valid fallback WAV.")
+                run([
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
+                    str(AUDIO_FILE)
+                ])
+                wav_file.unlink(missing_ok=True)
+                print(
+                    "WARNING: Local fallback narration is active. "
+                    "It may not pronounce Azerbaijani as naturally as neural TTS."
+                )
         except Exception as exc:
             raise RuntimeError(
-                f"Edge TTS səs yaradılması uğursuz oldu ({VOICE}): {exc}"
+                f"Edge TTS and local fallback both failed: {exc}"
             ) from exc
 
         if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
-            raise RuntimeError("Edge TTS did not create an audio file.")
+            raise RuntimeError("TTS did not create an audio file.")
 
         # Keep legacy Edge TTS duration fitting; ElevenLabs audio is never time-stretched.
         target_duration = float(os.getenv("TARGET_VIDEO_SECONDS", "193"))
