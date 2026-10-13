@@ -256,6 +256,22 @@ def generate_script(topic):
     language_names = {"az": "Azerbaijani", "en": "English", "tr": "Turkish"}
     language_name = language_names.get(LANGUAGE, "Azerbaijani")
     target_seconds = max(30, int(os.getenv("TARGET_VIDEO_SECONDS", "193")))
+    topic_lower = topic.lower()
+    is_brain_short = LANGUAGE == "az" and 40 <= target_seconds <= 60 and any(
+        word in topic_lower for word in ("beyin", "brain", "neyron", "neuron")
+    )
+    brain_short_fallback = (
+        "İnsan beyni bədənimizin idarəetmə mərkəzidir. O, nəfəs almaqdan yaddaşa "
+        "qədər saysız-hesabsız prosesi koordinasiya edir. Birinci fakt: beyin özü "
+        "ağrı reseptorlarına malik deyil, buna görə beyin toxuması birbaşa ağrı "
+        "hiss etmir. İkinci: yuxu zamanı beyin dayanmaq əvəzinə məlumatları emal "
+        "etməyə davam edir. Üçüncü: xatirələr video kimi saxlanmır; onları "
+        "xatırlayanda beyin yenidən qurur. Dördüncü: öyrənmək neyronlar arasındakı "
+        "əlaqələri dəyişə bilər. Beşinci: diqqət və yuxu yaddaşa ciddi təsir "
+        "göstərir. Beyin haqqında ən maraqlı şey onun daim dəyişə bilməsidir. "
+        "Bu səbəbdən yeni bacarıqlar öyrənmək və kifayət qədər yatmaq vacibdir. "
+        "Sən bu faktlardan hansını ilk dəfə eşitdin? Şərhdə yaz!"
+    )
     target_words = max(55, int(target_seconds * 2.05))
     min_words = max(45, int(target_words * 0.88))
     max_words = int(target_words * 1.12)
@@ -272,7 +288,10 @@ Return only the narration, without markdown, title, URL or stage directions.
         script = generate_text(prompt)
     except Exception as exc:
         print(f"Gemini script generation failed: {exc}")
-        if LANGUAGE == "az" and 150 <= target_seconds <= 220:
+        if is_brain_short:
+            script = brain_short_fallback
+            print("WARNING: Gemini əlçatan deyil; beyin mövzusu üçün daxili 50 saniyəlik Azərbaycan ssenarisi istifadə olunur.")
+        elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
             script = load_fallback_script()
             global TOPIC
             TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
@@ -286,13 +305,20 @@ Return only the narration, without markdown, title, URL or stage directions.
             corrected_count = count_script_words(corrected)
             if min_words * 0.8 <= corrected_count <= max_words * 1.2:
                 script, word_count = corrected, corrected_count
+            elif is_brain_short:
+                script = brain_short_fallback
+                word_count = count_script_words(script)
             elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
                 script = load_fallback_script()
                 word_count = count_script_words(script)
             else:
                 raise RuntimeError(f"Script length {corrected_count} is outside the target range.")
         except Exception as exc:
-            if LANGUAGE == "az" and 150 <= target_seconds <= 220:
+            if is_brain_short:
+                print(f"Correction unavailable, using built-in brain Shorts fallback: {exc}")
+                script = brain_short_fallback
+                word_count = count_script_words(script)
+            elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
                 print(f"Correction unavailable, using bundled fallback: {exc}")
                 script = load_fallback_script()
                 word_count = count_script_words(script)
