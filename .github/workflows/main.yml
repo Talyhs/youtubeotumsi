@@ -21,7 +21,7 @@ on:
         description: "Hədəf müddət (saniyə)"
         required: true
         type: choice
-        options: ["30", "60", "180", "300", "601"]
+        options: ["30", "50", "60", "180", "300", "601"]
         default: "180"
       video_format:
         description: "Video formatı"
