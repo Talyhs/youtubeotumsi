@@ -14,7 +14,8 @@ def upload_video(video_path, privacy="private", metadata_path=None, thumbnail_pa
     if token_text:
         info = json.loads(token_text)
     else:
-        token_file = Path(__file__).resolve().parents[1] / "token.json"
+        root = Path(os.getenv("TALYHS_BASE_DIR", str(Path(__file__).resolve().parents[1])))
+        token_file = root / "token.json"
         if not token_file.exists():
             raise RuntimeError("OAuth token.json not found. Complete YouTube OAuth locally first.")
         info = json.loads(token_file.read_text(encoding="utf-8"))
