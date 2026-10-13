@@ -117,7 +117,7 @@ class JobWorker(QThread):
                     credit += f" — license/source: {license_url}"
                 description = metadata.get("description", "")
                 if credit not in description:
-                    metadata["description"] = (description + "\\n\\n" + credit).strip()
+                    metadata["description"] = (description + "\n\n" + credit).strip()
                 metadata_file.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             update_job(job_id, "ready_for_review", str(VIDEO))
             self.done.emit(True, str(VIDEO), job_id)
@@ -139,7 +139,7 @@ class PublishWorker(QThread):
             result = upload_video(self.video_path, privacy=self.privacy,
                                   metadata_path=WORK / "metadata.json",
                                   thumbnail_path=WORK / "thumbnail_studio.jpg")
-            self.done.emit(True, f"Video yükləndi: {result['url']}\\nGörünmə: {result['privacy']}")
+            self.done.emit(True, f"Video yükləndi: {result['url']}\nGörünmə: {result['privacy']}")
         except Exception as exc:
             self.done.emit(False, str(exc))
 
@@ -239,7 +239,7 @@ class MainWindow(QMainWindow):
         privacy = getattr(self, "last_settings", {}).get("privacy", "private")
         prompt = "Videonu YouTube-a yükləmək istəyirsən? Görünmə: " + privacy.upper()
         if privacy == "public":
-            prompt += "\\n\\nDiqqət: video hamıya açıq olacaq."
+            prompt += "\n\nDiqqət: video hamıya açıq olacaq."
         answer = QMessageBox.question(self, "YouTube-a yüklə", prompt,
                                       QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer != QMessageBox.Yes:
