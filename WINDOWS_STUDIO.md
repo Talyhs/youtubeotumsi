@@ -25,7 +25,7 @@ This is an additive Windows desktop layer. It does not replace `app.py`, `youtub
 - This branch intentionally disables direct publishing from the first desktop iteration. Review the MP4 and thumbnail first; wire a separate explicit publish action after validating the OAuth flow and metadata.
 
 ## Recovery behavior
-The SQLite database is stored under `studio_data/studio.db` and ignored by Git. Each run records the engine and mastering stages. If a run fails, the error is stored in history. The existing `youtube.py` is still a monolithic step, so a failure inside that engine currently requires rerunning the engine; later refactoring can checkpoint stock search, narration, and rendering individually.
+The SQLite database is stored in the current user profile (`%APPDATA%/TalyhsStudio/studio.db` on Windows; `~/.talyhsstudio/studio.db` elsewhere). Each run records the engine and mastering stages. The history tab can resume a failed mastering stage from the saved MP4/audio artifacts. The existing `youtube.py` remains a monolithic step, so a failure inside stock search, narration or rendering still requires rerunning the engine; later refactoring can checkpoint those stages individually.
 
 ## Tests
 ```powershell
