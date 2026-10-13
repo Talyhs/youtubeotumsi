@@ -10,7 +10,7 @@ on:
         description: "Video mövzusu"
         required: true
         type: string
-        default: "10 maraqlı fakt"
+        default: "İnsan beyni: 5 maraqlı fakt"
       language:
         description: "Video dili"
         required: true
@@ -22,7 +22,7 @@ on:
         required: true
         type: choice
         options: ["30", "50", "60", "180", "300", "601"]
-        default: "180"
+        default: "50"
       video_format:
         description: "Video formatı"
         required: true
