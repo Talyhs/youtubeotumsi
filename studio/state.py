@@ -98,3 +98,8 @@ def record_asset(path, source="", source_url="", creator="", license_name="", li
         db.execute("""INSERT INTO assets(path,source,source_url,creator,license_name,license_url,attribution,checked_at)
                       VALUES(?,?,?,?,?,?,?,?)""",
                    (str(path), source, source_url, creator, license_name, license_url, attribution, now()))
+
+def step_status(job_id, name, db_path=DEFAULT_DB):
+    with connect(db_path) as db:
+        row = db.execute("SELECT status,details FROM steps WHERE job_id=? AND name=?", (job_id,name)).fetchone()
+    return dict(row) if row else None
