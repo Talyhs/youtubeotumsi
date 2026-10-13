@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import subprocess
+import json
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal, Qt
 from PySide6.QtWidgets import (
@@ -93,8 +94,31 @@ class JobWorker(QThread):
             mastered.replace(VIDEO)
             set_step(job_id, "mastering", "done", alignment_status)
             title = self.settings["topic"][:100]
-            make_thumbnail(title, WORK / "thumbnail_studio.jpg", WORK / "thumbnail.jpg")
+            make_thumbnail(title, WORK / "thumbnail_studio.jpg")
             set_step(job_id, "thumbnail", "done", str(WORK / "thumbnail_studio.jpg"))
+            # Preserve music attribution in the metadata sent to YouTube. If the user
+            # did not supply license details, clearly state that they remain unverified.
+            music_path = self.settings.get("music_path", "")
+            if music_path:
+                metadata_file = WORK / "metadata.json"
+                metadata = json.loads(metadata_file.read_text(encoding="utf-8")) if metadata_file.exists() else {
+                    "title": title, "description": "", "tags": [], "language": self.settings["language"]}
+                creator = self.settings.get("music_creator", "").strip()
+                license_name = self.settings.get("music_license", "").strip()
+                license_url = self.settings.get("music_license_url", "").strip()
+                credit = f"Music attribution: {Path(music_path).name}"
+                if creator:
+                    credit += f" — creator: {creator}"
+                if license_name and license_name != "Yükləyənin lisenziyasını yoxla":
+                    credit += f" — license: {license_name}"
+                else:
+                    credit += " — license not verified; check rights before publishing"
+                if license_url:
+                    credit += f" — license/source: {license_url}"
+                description = metadata.get("description", "")
+                if credit not in description:
+                    metadata["description"] = (description + "\\n\\n" + credit).strip()
+                metadata_file.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             update_job(job_id, "ready_for_review", str(VIDEO))
             self.done.emit(True, str(VIDEO), job_id)
         except Exception as exc:
