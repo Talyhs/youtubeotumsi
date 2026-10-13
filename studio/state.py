@@ -12,7 +12,7 @@ def _default_db():
         root = Path.home() / ".talyhsstudio"
     return root / "studio.db"
 
-DEFAULT_DB = _default_db()"
+DEFAULT_DB = _default_db()
 
 def connect(db_path=DEFAULT_DB):
     path = Path(db_path)
