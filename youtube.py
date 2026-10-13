@@ -579,8 +579,14 @@ def create_voice_and_subtitles(script):
     eleven_voice_id = os.getenv("ELEVENLABS_VOICE_ID", "").strip()
     eleven_model = os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3").strip() or "eleven_v3"
 
-    if provider not in {"auto", "elevenlabs", "edge"}:
-        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs or edge.")
+    fliki_key = os.getenv("FLIKI_API_KEY", "").strip()
+    fliki_voice_id = os.getenv("FLIKI_VOICE_ID", "").strip()
+    fliki_style_id = os.getenv("FLIKI_VOICE_STYLE_ID", "").strip()
+
+    if provider not in {"auto", "elevenlabs", "edge", "fliki"}:
+        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs, fliki or edge.")
+    if provider == "fliki" and not (fliki_key and fliki_voice_id):
+        raise RuntimeError("Fliki seçilib, amma FLIKI_API_KEY və FLIKI_VOICE_ID GitHub Secrets-də yoxdur.")
 
     use_elevenlabs = provider == "elevenlabs" or (
         provider == "auto" and bool(eleven_key and eleven_voice_id)
@@ -596,7 +602,47 @@ def create_voice_and_subtitles(script):
             "ELEVENLABS_VOICE_ID birlikdə verilməlidir."
         )
 
-    if use_elevenlabs:
+    if provider == "fliki":
+        print("4. Fliki ilə Azərbaycan dilində AI səsləndirmə hazırlanır...")
+        payload = {
+            "content": script[:3000],
+            "voiceId": fliki_voice_id,
+            "sampleRate": 48000,
+            "playbackRate": 1.0,
+            "format": "mp3",
+        }
+        if fliki_style_id:
+            payload["voiceStyleId"] = fliki_style_id
+        response = requests.post(
+            "https://api.fliki.ai/v1/generate/text-to-speech",
+            headers={
+                "Authorization": f"Bearer {fliki_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=(20, 240),
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Fliki TTS API xətası (HTTP {response.status_code}): "
+                f"{response.text[:1000]}"
+            )
+        result = response.json()
+        audio_url = result.get("audio")
+        if not audio_url or not str(audio_url).startswith("https://"):
+            raise RuntimeError("Fliki API etibarlı HTTPS audio URL qaytarmadı.")
+        audio_response = requests.get(audio_url, timeout=(20, 240))
+        audio_response.raise_for_status()
+        AUDIO_FILE.write_bytes(audio_response.content)
+        if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size < 1000:
+            raise RuntimeError("Fliki boş və ya yararsız audio faylı qaytardı.")
+        original_duration = get_audio_duration()
+        audio_duration = original_duration
+        # Skip both ElevenLabs and Edge TTS after successful Fliki synthesis.
+        use_elevenlabs = True
+        print(f"Fliki səsi hazırdır: {audio_duration:.1f} saniyə.")
+
+    if use_elevenlabs and provider != "fliki":
         print(f"4. ElevenLabs ilə yüksək keyfiyyətli səsləndirmə hazırlanır (model: {eleven_model})...")
         response = requests.post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{eleven_voice_id}",
