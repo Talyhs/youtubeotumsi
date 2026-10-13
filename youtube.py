@@ -459,79 +459,111 @@ def download_file(url, destination):
 
 
 def collect_clips(queries, wanted=5):
+    """Search stock providers with English query fallbacks; never fail solely because search returned zero results."""
     print("3. Searching available stock video providers...")
 
     providers = []
-
-    if PEXELS_KEY:
-        if "pexels" in STOCK_SOURCES or not STOCK_SOURCES:
-            providers.append(search_pexels)
-
-    if PIXABAY_KEY:
-        if "pixabay" in STOCK_SOURCES or not STOCK_SOURCES:
-            providers.append(search_pixabay)
-
-    if not providers:
-        raise RuntimeError(
-            "No stock video provider configured. "
-            "Add PEXELS_API_KEY or PIXABAY_API_KEY to GitHub Secrets."
-        )
+    if PEXELS_KEY and ("pexels" in STOCK_SOURCES or not STOCK_SOURCES):
+        providers.append(search_pexels)
+    if PIXABAY_KEY and ("pixabay" in STOCK_SOURCES or not STOCK_SOURCES):
+        providers.append(search_pixabay)
 
     candidates = []
     seen = set()
 
-    for query in queries:
+    # Search terms should be English: stock libraries generally return much
+    # better results for English than for Azerbaijani topic strings.
+    topic_text = " ".join(str(q) for q in (queries or []))
+    extra_queries = [
+        "human brain neuroscience",
+        "brain anatomy medical animation",
+        "neuroscience science laboratory",
+        "human thinking brain",
+        "medical science research",
+    ]
+    all_queries = []
+    for query in list(queries or []) + extra_queries:
+        query = re.sub(r"[^A-Za-z0-9 ,'-]", " ", str(query)).strip()
+        query = re.sub(r"\s+", " ", query)
+        if query and query.lower() not in {q.lower() for q in all_queries}:
+            all_queries.append(query)
+    if not all_queries:
+        all_queries = ["science laboratory", "medical science", "technology"]
+
+    for query in all_queries:
         for search in providers:
             try:
                 results = search(query)
-                print(
-                    f"{search.__name__}: "
-                    f"{len(results)} results for {query!r}"
-                )
-
+                print(f"{search.__name__}: {len(results)} results for {query!r}")
                 for item in results:
-                    key = (item["source"], item["id"] or item["url"])
+                    key = (item.get("source"), item.get("id") or item.get("url"))
                     if key not in seen:
                         seen.add(key)
                         candidates.append(item)
-
+                if len(candidates) >= wanted * 3:
+                    break
             except Exception as exc:
-                print(
-                    f"Provider {search.__name__} failed: {exc}. "
-                    "Trying the next provider."
-                )
-                continue
-
-    if not candidates:
-        raise RuntimeError(
-            "Neither configured provider returned usable videos. "
-            "Check API keys, quotas and network access."
-        )
+                print(f"Provider {search.__name__} failed for {query!r}: {exc}. Continuing.")
+        if len(candidates) >= wanted * 3:
+            break
 
     selected = []
-
     for item in candidates:
         path = WORK / f"stock_{len(selected) + 1}.mp4"
-
         try:
-            print("Downloading:", item["source"], item["page"])
+            print("Downloading:", item.get("source", "stock"), item.get("page", ""))
             download_file(item["url"], path)
             item["file"] = path
             selected.append(item)
-
             if len(selected) >= wanted:
                 break
-
         except Exception as exc:
-            print("Download failed; trying another clip:", exc)
+            print("Stock clip download failed; trying another clip:", exc)
+            path.unlink(missing_ok=True)
 
-    if not selected:
+    if selected:
+        print(f"Selected {len(selected)} stock video(s).")
+        return selected
+
+    # Last-resort, locally generated abstract backgrounds. This ensures an API
+    # zero-result/temporary outage does not crash the entire render job.
+    print("WARNING: No usable stock clips found. Creating local FFmpeg fallback visuals.")
+    fallback_items = []
+    duration = max(8, min(15, int(os.getenv("TARGET_VIDEO_SECONDS", "50"))))
+    colors = ["0x101B35", "0x162447", "0x203354", "0x172A3A", "0x242447"]
+    for index in range(min(max(1, wanted), len(colors))):
+        path = WORK / f"fallback_visual_{index + 1}.mp4"
+        color = colors[index]
+        try:
+            run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-f", "lavfi", "-i",
+                f"color=c={color}:s=720x1280:r=25:d={duration}",
+                "-vf", "format=yuv420p",
+                "-an", "-c:v", "libx264", "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                str(path),
+            ])
+            fallback_items.append({
+                "source": "Generated fallback",
+                "url": "",
+                "page": "",
+                "creator": "Talyhs YouTube Automation (generated background)",
+                "creator_url": "",
+                "id": f"fallback-{index + 1}",
+                "file": path,
+            })
+        except Exception as exc:
+            path.unlink(missing_ok=True)
+            print(f"Could not create fallback visual {index + 1}: {exc}")
+
+    if not fallback_items:
         raise RuntimeError(
-            "Videos were found, but none could be downloaded."
+            "Stock providers returned no usable videos and FFmpeg could not create fallback visuals. "
+            "Check FFmpeg installation and GitHub Actions logs."
         )
-
-    print(f"Selected {len(selected)} stock video(s).")
-    return selected
+    print(f"Created {len(fallback_items)} fallback visual(s); continuing video production.")
+    return fallback_items
 
 
 def create_voice_and_subtitles(script):
