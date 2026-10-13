@@ -619,21 +619,33 @@ def create_voice_and_subtitles(script):
             timeout=(20, 240),
         )
         if not response.ok:
-            # Avoid logging request headers or credentials.
+            # Never expose credentials. If the key lacks TTS permission, continue
+            # with Edge TTS so a permissions mistake does not abort video creation.
             detail = response.text[:1200]
-            raise RuntimeError(
-                f"ElevenLabs API xətası (HTTP {response.status_code}): {detail}"
+            if response.status_code == 401 and (
+                "text_to_speech" in detail or "missing_permissions" in detail
+            ):
+                print(
+                    "WARNING: ElevenLabs API key lacks text_to_speech permission. "
+                    "Falling back to Edge TTS; update the key permissions to restore ElevenLabs."
+                )
+                use_elevenlabs = False
+            else:
+                raise RuntimeError(
+                    f"ElevenLabs API xətası (HTTP {response.status_code}): {detail}"
+                )
+        if use_elevenlabs:
+            AUDIO_FILE.write_bytes(response.content)
+            if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size < 1000:
+                raise RuntimeError("ElevenLabs boş və ya yararsız audio qaytardı.")
+            original_duration = get_audio_duration()
+            audio_duration = original_duration
+            print(
+                f"ElevenLabs səsi hazırdır: {audio_duration:.1f} saniyə. "
+                "Təbii tələffüzü qorumaq üçün səs sürətləndirilmir."
             )
-        AUDIO_FILE.write_bytes(response.content)
-        if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size < 1000:
-            raise RuntimeError("ElevenLabs boş və ya yararsız audio qaytardı.")
-        original_duration = get_audio_duration()
-        audio_duration = original_duration
-        print(
-            f"ElevenLabs səsi hazırdır: {audio_duration:.1f} saniyə. "
-            "Təbii tələffüzü qorumaq üçün səs sürətləndirilmir."
-        )
-    else:
+
+    if not use_elevenlabs:
         print(f"4. Edge TTS ilə səsləndirmə hazırlanır ({VOICE})...")
         async def synthesize():
             communicate = edge_tts.Communicate(script, VOICE, rate="+0%")
