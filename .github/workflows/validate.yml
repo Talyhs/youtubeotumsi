@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile Python files (syntax check)
-        run: python -m compileall -q youtube.py app.py
+        run: python -m compileall -q youtube.py app.py whatsapp_bot.py
       - name: Validate required files
         run: |
           test -f .github/workflows/main.yml
