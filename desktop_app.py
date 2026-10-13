@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTableWidget, QTableWidgetItem, QDateEdit, QSpinBox,
     QProgressBar
 )
-from studio.state import init_db, create_job, update_job, set_step, list_jobs, add_calendar_item, list_calendar, delete_calendar_item, record_asset
+from studio.state import init_db, create_job, update_job, set_step, list_jobs, add_calendar_item, list_calendar, delete_calendar_item, record_asset, completed_step
 from studio.ollama import generate_script
 from studio.media import master_video, align_words, make_thumbnail
 from studio.publish import upload_video
@@ -134,6 +134,41 @@ class JobWorker(QThread):
             set_step(job_id, "last_error", "failed", str(exc))
             self.done.emit(False, str(exc), job_id)
 
+class MasteringResumeWorker(QThread):
+    log = Signal(str)
+    done = Signal(bool, str, int)
+    def __init__(self, job_id, settings):
+        super().__init__()
+        self.job_id = job_id
+        self.settings = settings
+    def run(self):
+        try:
+            if not VIDEO.exists() or not (WORK / "voiceover.mp3").exists():
+                raise RuntimeError("Davam etmək üçün youtube_short.mp4 və work/voiceover.mp3 faylları olmalıdır.")
+            if completed_step(self.job_id, "mastering"):
+                raise RuntimeError("Bu işin montaj mərhələsi artıq tamamlanıb; tam yenidən montaj üçün yeni iş başlat.")
+            set_step(self.job_id, "mastering", "running", "resumed from saved artifacts")
+            aligned_path = ""
+            detail = "existing subtitle track kept"
+            if self.settings["accurate_subtitles"]:
+                aligned_path, detail = align_words(WORK / "voiceover.mp3", WORK / "subtitles_aligned.ass",
+                                                    self.settings["language"], model_name="small")
+                if not aligned_path and (WORK / "subtitles.ass").exists():
+                    aligned_path = str(WORK / "subtitles.ass")
+            mastered = ROOT / "youtube_short_resumed.mp4"
+            master_video(VIDEO, mastered, WORK / "voiceover.mp3",
+                         self.settings.get("music_path") or None,
+                         self.settings["audio_profile"], aligned_path or None,
+                         self.settings["music_volume"])
+            mastered.replace(VIDEO)
+            set_step(self.job_id, "mastering", "done", "resumed: " + detail)
+            update_job(self.job_id, "ready_for_review", str(VIDEO))
+            self.done.emit(True, str(VIDEO), self.job_id)
+        except Exception as exc:
+            set_step(self.job_id, "mastering", "failed", str(exc))
+            update_job(self.job_id, "failed", error=str(exc))
+            self.done.emit(False, str(exc), self.job_id)
+
 class PublishWorker(QThread):
     log = Signal(str)
     done = Signal(bool, str)
@@ -199,8 +234,9 @@ class MainWindow(QMainWindow):
         buttons = QHBoxLayout()
         self.generate_btn = QPushButton("▶ Video hazırla (yalnız baxış üçün)"); self.generate_btn.clicked.connect(self._generate)
         self.preview_btn = QPushButton("Videoya bax"); self.preview_btn.clicked.connect(self._preview); self.preview_btn.setEnabled(VIDEO.exists())
+        self.edit_btn = QPushButton("Shotcut-da redaktə et"); self.edit_btn.clicked.connect(self._edit_in_shotcut)
         self.publish_btn = QPushButton("YouTube-a yüklə"); self.publish_btn.clicked.connect(self._publish); self.publish_btn.setEnabled(False)
-        buttons.addWidget(self.generate_btn); buttons.addWidget(self.preview_btn); buttons.addWidget(self.publish_btn)
+        buttons.addWidget(self.generate_btn); buttons.addWidget(self.preview_btn); buttons.addWidget(self.edit_btn); buttons.addWidget(self.publish_btn)
         layout.addLayout(buttons)
         self.log = QTextEdit(); self.log.setReadOnly(True); layout.addWidget(self.log, 1)
         layout.addWidget(QLabel("Təhlükəsizlik: bu proqram videonu əvvəlcə lokal hazırlayır. Public yükləmə ayrıca təsdiq tələb edir."))
@@ -234,6 +270,46 @@ class MainWindow(QMainWindow):
         else:
             self.log.append("XƏTA: " + message)
             QMessageBox.critical(self, "Video hazırlamaq alınmadı", message)
+    def _edit_in_shotcut(self):
+        if not VIDEO.exists():
+            QMessageBox.information(self, "Video yoxdur", "Əvvəl video hazırla.")
+            return
+        candidates = [shutil.which("shotcut"),
+                      r"C:\\Program Files\\Shotcut\\shotcut.exe",
+                      r"C:\\Program Files (x86)\\Shotcut\\shotcut.exe"]
+        executable = next((p for p in candidates if p and Path(p).exists()), None)
+        if not executable:
+            QMessageBox.information(self, "Shotcut tapılmadı",
+                "Video hazırdır, amma Shotcut kompüterdə tapılmadı. Shotcut-u ayrıca quraşdır, sonra bu düymədən aç.")
+            return
+        subprocess.Popen([str(executable), str(VIDEO)], cwd=ROOT)
+    def _resume_mastering(self):
+        jobs = list_jobs(limit=1)
+        if not jobs:
+            QMessageBox.information(self, "İş yoxdur", "Əvvəl video hazırlamağa başla.")
+            return
+        job = jobs[0]
+        if job["status"] != "failed" or not completed_step(job["id"], "engine") or completed_step(job["id"], "mastering"):
+            QMessageBox.information(self, "Davam etmək mümkün deyil",
+                "Son işdə engine uğurla bitmiş, montaj isə tamamlanmamış olmalıdır. Əks halda yeni iş başlat.")
+            return
+        settings = {"language": self.language.currentData(), "audio_profile": self.audio_profile.currentData(),
+                    "accurate_subtitles": self.whisper.isChecked(), "music_path": self.music_path.text().strip(),
+                    "music_volume": self.music_volume.value()/100}
+        self.progress.show()
+        self.resume_worker = MasteringResumeWorker(job["id"], settings)
+        self.resume_worker.log.connect(self.log.append)
+        self.resume_worker.done.connect(self._resume_done)
+        self.resume_worker.start()
+    def _resume_done(self, ok, message, job_id):
+        self.progress.hide()
+        self.preview_btn.setEnabled(VIDEO.exists())
+        self.publish_btn.setEnabled(ok)
+        self._refresh_history()
+        if ok:
+            QMessageBox.information(self, "Montaj tamamlandı", f"İş #{job_id} davam etdirildi. Videonu yoxla.")
+        else:
+            QMessageBox.critical(self, "Davam etdirmək alınmadı", message)
     def _preview(self):
         if VIDEO.exists():
             from PySide6.QtCore import QUrl
@@ -293,6 +369,7 @@ class MainWindow(QMainWindow):
         w=QWidget(); layout=QVBoxLayout(w); self.history_table=QTableWidget(0,5)
         self.history_table.setHorizontalHeaderLabels(["ID","Mövzu","Dil","Status","Fayl / Xəta"])
         layout.addWidget(self.history_table); btn=QPushButton("Tarixçəni yenilə"); btn.clicked.connect(self._refresh_history); layout.addWidget(btn)
+        resume=QPushButton("Uğursuz montaj mərhələsini davam et"); resume.clicked.connect(self._resume_mastering); layout.addWidget(resume)
         self._refresh_history(); return w
     def _refresh_history(self):
         rows=list_jobs(); self.history_table.setRowCount(len(rows))
