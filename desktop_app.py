@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 from studio.state import init_db, create_job, update_job, set_step, list_jobs, add_calendar_item, list_calendar, delete_calendar_item
 from studio.ollama import generate_script
-from studio.media import master_video, align_words, make_thumbnail
+from studio.media import master_video, align_words, make_thumbnail\nfrom studio.publish import upload_video
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -89,6 +89,23 @@ class JobWorker(QThread):
             update_job(job_id, "failed", error=str(exc))
             set_step(job_id, "last_error", "failed", str(exc))
             self.done.emit(False, str(exc), job_id)
+
+class PublishWorker(QThread):
+    log = Signal(str)
+    done = Signal(bool, str)
+    def __init__(self, video_path, privacy):
+        super().__init__()
+        self.video_path = video_path
+        self.privacy = privacy
+    def run(self):
+        try:
+            self.log.emit("YouTube OAuth ilə video yüklənir...")
+            result = upload_video(self.video_path, privacy=self.privacy,
+                                  metadata_path=WORK / "metadata.json",
+                                  thumbnail_path=WORK / "thumbnail_studio.jpg")
+            self.done.emit(True, f"Video yükləndi: {result['url']}\\nGörünmə: {result['privacy']}")
+        except Exception as exc:
+            self.done.emit(False, str(exc))
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -168,8 +185,32 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(VIDEO)))
         else: QMessageBox.information(self, "Video yoxdur", "Əvvəl video hazırla.")
     def _publish(self):
-        QMessageBox.information(self, "Yükləmə ayrıca qurulmalıdır",
-            "Bu ilkin versiya təhlükəsiz şəkildə videonu yalnız hazırlayır. YouTube-a yükləmə üçün OAuth token və ayrıca təsdiqli publish_existing.py mərhələsi növbəti addımdır.")
+        if not VIDEO.exists():
+            QMessageBox.warning(self, "Video yoxdur", "Əvvəlcə video hazırla.")
+            return
+        privacy = getattr(self, "last_settings", {}).get("privacy", "private")
+        prompt = "Videonu YouTube-a yükləmək istəyirsən? Görünmə: " + privacy.upper()
+        if privacy == "public":
+            prompt += "\\n\\nDiqqət: video hamıya açıq olacaq."
+        answer = QMessageBox.question(self, "YouTube-a yüklə", prompt,
+                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self.publish_btn.setEnabled(False)
+        self.progress.show()
+        self.publish_worker = PublishWorker(str(VIDEO), privacy)
+        self.publish_worker.log.connect(self.log.append)
+        self.publish_worker.done.connect(self._publish_done)
+        self.publish_worker.start()
+    def _publish_done(self, ok, message):
+        self.progress.hide()
+        self.publish_btn.setEnabled(VIDEO.exists())
+        if ok:
+            QMessageBox.information(self, "Yükləmə tamamlandı", message)
+            self.log.append(message)
+        else:
+            QMessageBox.critical(self, "YouTube yükləmə xətası", message)
+            self.log.append("YÜKLƏMƏ XƏTASI: " + message)
     def _build_calendar_tab(self):
         w=QWidget(); layout=QVBoxLayout(w); form=QFormLayout()
         self.cal_topic=QLineEdit(); self.cal_language=QComboBox()
