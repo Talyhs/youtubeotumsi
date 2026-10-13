@@ -92,8 +92,8 @@ jobs:
       ADD_SUBTITLES: ${{ github.event_name == 'workflow_dispatch' && inputs.subtitles || 'true' }}
       CREATE_THUMBNAIL: ${{ github.event_name == 'workflow_dispatch' && inputs.thumbnail || 'true' }}
       ENABLE_SEO: ${{ github.event_name == 'workflow_dispatch' && inputs.seo || 'true' }}
-      YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy || 'public' }}
-      PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'upload' }}
+      YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy || 'private' }}
+      PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'prepare' }}
 
     steps:
       - name: Checkout repository
