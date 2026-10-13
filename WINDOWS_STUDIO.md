@@ -17,7 +17,7 @@ This is an additive Windows desktop layer. It does not replace `app.py`, `youtub
 3. The existing pipeline needs Pexels or Pixabay credentials and, unless using the local-script override, Gemini credentials. Set secrets as environment variables or use a local untracked .env loader of your choice; never commit them.
 4. To use local Ollama, install Ollama separately, start it, then pull a model such as `ollama pull qwen2.5:3b`. Select the local Ollama checkbox in the GUI.
 5. For optional word-level alignment, activate the same virtual environment and run `pip install -r requirements-alignment.txt`. First-run model downloads require internet. Word-level alignment support varies by language; Azerbaijani alignment must be verified against real audio.
-6. To build an EXE, run `build_windows.bat` on Windows. PyInstaller is not a cross-compiler; build on the target OS.
+6. To build the Windows app, run `build_windows.bat` on Windows. It creates a desktop EXE and a separate `engine/TalyhsEngine.exe` bundle; keep the engine folder beside the desktop app. FFmpeg must still be installed and available in PATH. Place local `.env` and `token.json` beside the desktop EXE. PyInstaller is not a cross-compiler; build on the target OS.
 
 ## Secrets and OAuth
 - Never commit `.env`, `token.json`, `client_secrets.json`, API keys, or generated media.
