@@ -6,8 +6,18 @@ if not exist .venv\Scripts\python.exe (
   exit /b 1
 )
 call .venv\Scripts\activate.bat
+REM Build the existing video engine as a separate console executable.
+python -m PyInstaller --noconfirm --clean --console --name TalyhsEngine ^
+  --distpath build_engine\dist --workpath build_engine\work youtube.py
+if errorlevel 1 exit /b 1
+REM Build the desktop interface as a windowed app.
 python -m PyInstaller --noconfirm --clean --windowed --name TalyhsStudio desktop_app.py
+if errorlevel 1 exit /b 1
+if not exist dist\TalyhsStudio\engine mkdir dist\TalyhsStudio\engine
+xcopy /E /I /Y build_engine\dist\TalyhsEngine dist\TalyhsStudio\engine >nul
+copy /Y sample_script_10_facts_az.txt dist\TalyhsStudio\sample_script_10_facts_az.txt >nul
 echo.
-echo Build finished. Check dist\TalyhsStudio\TalyhsStudio.exe
-echo FFmpeg must be installed separately and available in PATH.
+echo Build finished: dist\TalyhsStudio\TalyhsStudio.exe
+echo Keep the engine folder beside the app. FFmpeg must be installed and available in PATH.
+echo Place your local .env and token.json beside TalyhsStudio.exe. Never upload them to GitHub.
 pause
