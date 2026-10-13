@@ -309,15 +309,15 @@ def generate_metadata(script):
     topic = TOPIC.strip() or "interesting facts"
     topic_words = list(dict.fromkeys(re.findall(r"[A-Za-zƏəIıİiÖöÜüĞğŞşÇç]+", topic.lower())))
     if LANGUAGE == "en":
-        title = f"10 Interesting Facts: {topic}"[:100]
+        title = f"{topic} | Interesting Facts"[:100]
         description = f"Discover interesting facts about {topic}. Watch to the end and share your thoughts.\n\nNARRATION:\n{script.strip()}\n\n#Facts #Learning #Science"
         tags = (topic_words + ["interesting facts", "educational", "science", "learn"])[:15]
     elif LANGUAGE == "tr":
-        title = f"10 İlginç Bilgi: {topic}"[:100]
+        title = f"{topic} | İlginç Bilgiler"[:100]
         description = f"{topic} hakkında ilginç bilgiler. Sonuna kadar izleyin ve düşüncelerinizi yorumlarda paylaşın.\n\nVİDEO METNİ:\n{script.strip()}\n\n#İlginçBilgiler #Bilim #Öğren"
         tags = (topic_words + ["ilginç bilgiler", "eğitim", "bilim", "öğren"])[:15]
     else:
-        title = f"10 Maraqlı Fakt: {topic}"[:100]
+        title = f"{topic} | Maraqlı faktlar"[:100]
         description = f"{topic} haqqında maraqlı faktlar. Videonu sonadək izləyin və fikrinizi şərhdə yazın.\n\nVİDEODA SƏSLƏNƏN MƏTN:\n{script.strip()}\n\n#MaraqlıFaktlar #Azərbaycan #Elm"
         tags = (topic_words + ["10 maraqlı fakt", "maraqlı məlumatlar", "elm", "öyrən"])[:15]
     metadata = {"title": title, "description": description[:4900], "tags": tags, "language": LANGUAGE, "topic": topic}
@@ -331,7 +331,7 @@ def search_pexels(query):
         headers={"Authorization": PEXELS_KEY},
         params={
             "query": query,
-            "orientation": "landscape",
+            "orientation": "portrait" if VIDEO_FORMAT == "vertical" else "landscape",
             "size": "medium",
             "per_page": 8,
         },
@@ -593,7 +593,7 @@ def create_voice_and_subtitles(script):
                     "Trying local espeak-ng fallback."
                 )
                 wav_file = WORK / "voiceover_fallback.wav"
-                fallback_voice = "en-us" if LANGUAGE == "en" else "tr" if LANGUAGE == "tr" else "en"
+                fallback_voice = "en-us" if LANGUAGE == "en" else "tr"
                 run([
                     "espeak-ng", "-v", fallback_voice, "-s", "145",
                     "-w", str(wav_file), script
@@ -1122,7 +1122,20 @@ def main():
     requested_topic = os.getenv("VIDEO_TOPIC", "").strip()
     if requested_topic:
         TOPIC = requested_topic
-        stock_queries = [requested_topic, requested_topic + " nature", requested_topic + " science"]
+        topic_lower = requested_topic.lower()
+        if any(word in topic_lower for word in ("beyin", "brain", "neuron", "neyron")):
+            stock_queries = [
+                "human brain neuroscience animation",
+                "brain neurons medical visualization",
+                "human brain anatomy 3d",
+                "person thinking close up",
+            ]
+        else:
+            stock_queries = [
+                requested_topic,
+                requested_topic + " science",
+                requested_topic + " educational video",
+            ]
     else:
         TOPIC, stock_queries = get_daily_topic()
     print("Topic:", TOPIC)
