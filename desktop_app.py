@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
 )
 from studio.state import init_db, create_job, update_job, set_step, list_jobs, add_calendar_item, list_calendar, delete_calendar_item, record_asset
 from studio.ollama import generate_script
-from studio.media import master_video, align_words, make_thumbnail\nfrom studio.publish import upload_video
+from studio.media import master_video, align_words, make_thumbnail
+from studio.publish import upload_video
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
