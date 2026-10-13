@@ -17,7 +17,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(os.getenv("TALYHS_BASE_DIR", str(Path(__file__).resolve().parent))).resolve()
 WORK = BASE / "work"
 WORK.mkdir(exist_ok=True)
 
