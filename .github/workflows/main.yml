@@ -156,7 +156,10 @@ jobs:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
           ELEVENLABS_MODEL_ID: eleven_v3
-          VOICE_PROVIDER: elevenlabs
+          FLIKI_API_KEY: ${{ secrets.FLIKI_API_KEY }}
+          FLIKI_VOICE_ID: ${{ secrets.FLIKI_VOICE_ID }}
+          FLIKI_VOICE_STYLE_ID: ${{ secrets.FLIKI_VOICE_STYLE_ID }}
+          VOICE_PROVIDER: fliki
           SD_WEBUI_URL: ${{ secrets.SD_WEBUI_URL }}
           SD_WEBUI_USERNAME: ${{ secrets.SD_WEBUI_USERNAME }}
           SD_WEBUI_PASSWORD: ${{ secrets.SD_WEBUI_PASSWORD }}
