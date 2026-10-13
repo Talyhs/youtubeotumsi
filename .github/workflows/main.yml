@@ -159,7 +159,7 @@ jobs:
           FLIKI_API_KEY: ${{ secrets.FLIKI_API_KEY }}
           FLIKI_VOICE_ID: ${{ secrets.FLIKI_VOICE_ID }}
           FLIKI_VOICE_STYLE_ID: ${{ secrets.FLIKI_VOICE_STYLE_ID }}
-          VOICE_PROVIDER: fliki
+          VOICE_PROVIDER: edge
           SD_WEBUI_URL: ${{ secrets.SD_WEBUI_URL }}
           SD_WEBUI_USERNAME: ${{ secrets.SD_WEBUI_USERNAME }}
           SD_WEBUI_PASSWORD: ${{ secrets.SD_WEBUI_PASSWORD }}
@@ -201,7 +201,7 @@ jobs:
         with:
           name: youtube-final-video
           path: youtube_short.mp4
-          if-no-files-found: warn
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Save production files
