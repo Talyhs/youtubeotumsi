@@ -10,7 +10,7 @@ on:
         description: "Video mövzusu"
         required: true
         type: string
-        default: "İnsan beyni: 5 maraqlı fakt"
+        default: "Taksinin yaranma tarixi"
       language:
         description: "Video dili"
         required: true
@@ -21,8 +21,8 @@ on:
         description: "Hədəf müddət (saniyə)"
         required: true
         type: choice
-        options: ["30", "50", "60", "180", "300", "601"]
-        default: "50"
+        options: ["30", "50", "55", "60", "180", "300", "601"]
+        default: "55"
       video_format:
         description: "Video formatı"
         required: true
@@ -134,7 +134,6 @@ jobs:
           python - <<'PY'
           import json
           import os
-          import sys
           required = ("GEMINI_API_KEY",) + (("TOKEN_JSON",) if os.environ.get("PUBLISH_MODE", "upload") == "upload" else ())
           missing = [name for name in required if not os.environ.get(name, "").strip()]
           if missing:
