@@ -1,0 +1,3 @@
+# Optional and heavyweight: install only when word-level alignment is needed.
+# Verify language-specific alignment model availability for Azerbaijani before use.
+whisperx>=3.3
