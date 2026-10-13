@@ -253,6 +253,7 @@ def count_script_words(script):
 
 
 def generate_script(topic):
+    global TOPIC
     language_names = {"az": "Azerbaijani", "en": "English", "tr": "Turkish"}
     language_name = language_names.get(LANGUAGE, "Azerbaijani")
     target_seconds = max(30, int(os.getenv("TARGET_VIDEO_SECONDS", "193")))
@@ -274,7 +275,6 @@ Return only the narration, without markdown, title, URL or stage directions.
         print(f"Gemini script generation failed: {exc}")
         if LANGUAGE == "az" and 150 <= target_seconds <= 220:
             script = load_fallback_script()
-            global TOPIC
             TOPIC = "Elm və gündəlik həyatdan 10 maraqlı fakt"
         else:
             raise RuntimeError("Gemini əlçatan deyil və bu dil/müddət üçün ehtiyat ssenari yoxdur.") from exc
