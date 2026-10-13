@@ -622,12 +622,22 @@ def create_voice_and_subtitles(script):
             # Never expose credentials. If the key lacks TTS permission, continue
             # with Edge TTS so a permissions mistake does not abort video creation.
             detail = response.text[:1200]
-            if response.status_code == 401 and (
+            missing_tts_permission = response.status_code == 401 and (
                 "text_to_speech" in detail or "missing_permissions" in detail
-            ):
+            )
+            missing_voice = response.status_code == 404 and (
+                "voice_not_found" in detail or "not_found" in detail
+            )
+            if missing_tts_permission:
                 print(
                     "WARNING: ElevenLabs API key lacks text_to_speech permission. "
                     "Falling back to Edge TTS; update the key permissions to restore ElevenLabs."
+                )
+                use_elevenlabs = False
+            elif missing_voice:
+                print(
+                    "WARNING: ElevenLabs voice ID was not found or is not accessible to this API key. "
+                    "Falling back to Edge TTS. Check ELEVENLABS_VOICE_ID and voice access in ElevenLabs."
                 )
                 use_elevenlabs = False
             else:
