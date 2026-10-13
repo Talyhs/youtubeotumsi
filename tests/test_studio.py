@@ -1,4 +1,8 @@
 from pathlib import Path
+import sys
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 from studio.state import init_db, create_job, set_step, completed_step, list_jobs, add_calendar_item, list_calendar
 from studio.media import AUDIO_PROFILES
 
