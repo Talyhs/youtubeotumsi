@@ -11,12 +11,17 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTableWidget, QTableWidgetItem, QDateEdit, QSpinBox,
     QProgressBar
 )
-from studio.state import init_db, create_job, update_job, set_step, list_jobs, add_calendar_item, list_calendar, delete_calendar_item
+from studio.state import init_db, create_job, update_job, set_step, list_jobs, add_calendar_item, list_calendar, delete_calendar_item, record_asset
 from studio.ollama import generate_script
 from studio.media import master_video, align_words, make_thumbnail\nfrom studio.publish import upload_video
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / ".env")
+except ImportError:
+    pass
 WORK = ROOT / "work"
 VIDEO = ROOT / "youtube_short.mp4"
 
@@ -28,6 +33,12 @@ class JobWorker(QThread):
         self.settings = settings
     def run(self):
         job_id = create_job(self.settings["topic"], self.settings["language"])
+        if self.settings.get("music_path"):
+            from studio.state import record_asset
+            record_asset(self.settings["music_path"], source="local audio",
+                         creator=self.settings.get("music_creator", ""),
+                         license_name=self.settings.get("music_license", ""),
+                         license_url=self.settings.get("music_license_url", ""))
         env = os.environ.copy()
         env.update({
             "VIDEO_TOPIC": self.settings["topic"],
@@ -135,6 +146,9 @@ class MainWindow(QMainWindow):
         self.ollama_model = QLineEdit("qwen2.5:3b")
         self.whisper = QCheckBox("Səsdən söz-söz subtitr zamanlaması (WhisperX tələb edir)")
         self.music_path = QLineEdit()
+        self.music_creator = QLineEdit()
+        self.music_license = QLineEdit("Yükləyənin lisenziyasını yoxla")
+        self.music_license_url = QLineEdit()
         browse = QPushButton("Musiqi seç"); browse.clicked.connect(self._browse_music)
         music_row = QHBoxLayout(); music_row.addWidget(self.music_path); music_row.addWidget(browse)
         self.music_volume = QSpinBox(); self.music_volume.setRange(0,25); self.music_volume.setValue(10); self.music_volume.setSuffix("%")
@@ -142,7 +156,11 @@ class MainWindow(QMainWindow):
         form.addRow("Müddət", self.duration); form.addRow("Səs", self.voice); form.addRow("Format", self.format)
         form.addRow("Yayımlama", self.privacy); form.addRow("Audio profili", self.audio_profile)
         form.addRow("", self.ollama); form.addRow("Ollama modeli", self.ollama_model); form.addRow("", self.whisper)
-        form.addRow("Fon musiqisi", music_row); form.addRow("Musiqi səviyyəsi", self.music_volume)
+        form.addRow("Fon musiqisi", music_row)
+        form.addRow("Musiqi müəllifi", self.music_creator)
+        form.addRow("Lisenziya", self.music_license)
+        form.addRow("Lisenziya URL-si", self.music_license_url)
+        form.addRow("Musiqi səviyyəsi", self.music_volume)
         layout.addLayout(form)
         self.progress = QProgressBar(); self.progress.setRange(0,0); self.progress.hide(); layout.addWidget(self.progress)
         buttons = QHBoxLayout()
@@ -156,7 +174,9 @@ class MainWindow(QMainWindow):
         return w
     def _browse_music(self):
         path, _ = QFileDialog.getOpenFileName(self, "Fon musiqisi seç", "", "Audio (*.mp3 *.wav *.m4a *.flac)")
-        if path: self.music_path.setText(path)
+        if path:
+            self.music_path.setText(path)
+            self.log.append("Musiqi seçildi. Lisenziyanı yoxla və məlumatlarını doldur.")
     def _generate(self):
         if not self.topic.text().strip():
             QMessageBox.warning(self, "Mövzu lazımdır", "Video mövzusunu daxil et."); return
@@ -166,11 +186,14 @@ class MainWindow(QMainWindow):
                     "audio_profile": self.audio_profile.currentData(), "accurate_subtitles": self.whisper.isChecked(),
                     "ollama": self.ollama.isChecked(), "ollama_model": self.ollama_model.text().strip() or "qwen2.5:3b",
                     "music_path": self.music_path.text().strip(), "music_volume": self.music_volume.value()/100,
+                    "music_creator": self.music_creator.text().strip(),
+                    "music_license": self.music_license.text().strip(),
+                    "music_license_url": self.music_license_url.text().strip(),
                     "whisper_model": "small"}
         self.generate_btn.setEnabled(False); self.publish_btn.setEnabled(False); self.progress.show(); self.log.clear()
         self.worker = JobWorker(settings); self.worker.log.connect(self.log.append); self.worker.done.connect(self._job_done); self.worker.start()
     def _job_done(self, ok, message, job_id):
-        self.progress.hide(); self.generate_btn.setEnabled(True); self.preview_btn.setEnabled(VIDEO.exists())
+        self.progress.hide(); self.generate_btn.setEnabled(True); self.preview_btn.setEnabled(VIDEO.exists()); self._refresh_history()
         if ok:
             self.log.append(f"İş #{job_id} hazırdır: {message}")
             self.publish_btn.setEnabled(True)
