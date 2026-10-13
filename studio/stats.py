@@ -11,7 +11,8 @@ def get_youtube_service():
     if token_text:
         info = json.loads(token_text)
     else:
-        token_file = Path(__file__).resolve().parents[1] / "token.json"
+        root = Path(os.getenv("TALYHS_BASE_DIR", str(Path(__file__).resolve().parents[1])))
+        token_file = root / "token.json"
         if not token_file.exists():
             raise RuntimeError("YouTube OAuth token not found. Put token.json locally or set TOKEN_JSON.")
         info = json.loads(token_file.read_text(encoding="utf-8"))
