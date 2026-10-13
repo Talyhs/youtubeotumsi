@@ -1,10 +1,18 @@
 """SQLite state store for resumable production, calendar and asset credits."""
 from __future__ import annotations
 import sqlite3
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 
-DEFAULT_DB = Path(__file__).resolve().parents[1] / "studio_data" / "studio.db"
+def _default_db():
+    if os.name == "nt":
+        root = Path(os.getenv("APPDATA", str(Path.home()))) / "TalyhsStudio"
+    else:
+        root = Path.home() / ".talyhsstudio"
+    return root / "studio.db"
+
+DEFAULT_DB = _default_db()"
 
 def connect(db_path=DEFAULT_DB):
     path = Path(db_path)
