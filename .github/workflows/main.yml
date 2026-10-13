@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: "0 9 * * *"
       timezone: "Asia/Baku"
+    - cron: "0 14 * * *"
+      timezone: "Asia/Baku"
+    - cron: "0 19 * * *"
+      timezone: "Asia/Baku"
   workflow_dispatch:
     inputs:
       topic:
@@ -84,7 +88,7 @@ jobs:
     timeout-minutes: 60
     env:
       VIDEO_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
-      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'az' }}
+      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'tr' }}
       TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
       VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
       VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'auto' }}
