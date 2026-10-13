@@ -77,7 +77,7 @@ with tab_create:
         topic = st.text_input("Video mövzusu", placeholder="Məsələn: Süni intellekt haqqında 10 maraqlı fakt")
         language = st.selectbox("Dil", ["Azərbaycan dili", "English", "Türkçe"], index=0)
         video_format = st.radio("Format", ["Shorts / şaquli 9:16", "Standart / üfüqi 16:9"], horizontal=False)
-        duration_label = st.selectbox("Müddət", ["30 saniyə", "1 dəqiqə", "3 dəqiqə", "5 dəqiqə", "10 dəqiqə 1 saniyə"], index=2)
+        duration_label = st.selectbox("Müddət", ["30 saniyə", "50 saniyə", "1 dəqiqə", "3 dəqiqə", "5 dəqiqə", "10 dəqiqə 1 saniyə"], index=1)
         voice = st.selectbox("Səs", ["Avtomatik", "Kişi səsi", "Qadın səsi"], index=0)
     with right:
         stock = st.multiselect("Stok video mənbələri", ["Pixabay", "Pexels"], default=["Pixabay", "Pexels"])
@@ -87,7 +87,7 @@ with tab_create:
         privacy_label = st.selectbox("YouTube görünməsi", ["Private — yalnız mən", "Unlisted — linki olanlar", "Public — hamı"], index=0)
         publish_mode = st.selectbox("Yayımlama rejimi", ["Hazırla, yayımlama", "Hazırla və seçilmiş görünmə ilə yüklə"], index=0)
         schedule = st.checkbox("Təyin olunmuş vaxtda yayımlama (əlavə quraşdırma tələb edir)", value=False, disabled=True)
-    durations = {"30 saniyə": "30", "1 dəqiqə": "60", "3 dəqiqə": "180", "5 dəqiqə": "300", "10 dəqiqə 1 saniyə": "601"}
+    durations = {"30 saniyə": "30", "50 saniyə": "50", "1 dəqiqə": "60", "3 dəqiqə": "180", "5 dəqiqə": "300", "10 dəqiqə 1 saniyə": "601"}
     languages = {"Azərbaycan dili": "az", "English": "en", "Türkçe": "tr"}
     privacy = {"Private — yalnız mən": "private", "Unlisted — linki olanlar": "unlisted", "Public — hamı": "public"}
     voices = {"Avtomatik": "auto", "Kişi səsi": "male", "Qadın səsi": "female"}
