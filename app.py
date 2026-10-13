@@ -84,8 +84,8 @@ with tab_create:
         subtitles = st.checkbox("Sinxron subtitrlər əlavə et", value=True)
         thumbnail = st.checkbox("Thumbnail şəkli yarat", value=True)
         seo = st.checkbox("SEO başlıq və təsvir hazırla", value=True)
-        privacy_label = st.selectbox("YouTube görünməsi", ["Private — yalnız mən", "Unlisted — linki olanlar", "Public — hamı"], index=0)
-        publish_mode = st.selectbox("Yayımlama rejimi", ["Hazırla, yayımlama", "Hazırla və seçilmiş görünmə ilə yüklə"], index=0)
+        privacy_label = st.selectbox("YouTube görünməsi", ["Private — yalnız mən", "Unlisted — linki olanlar", "Public — hamı"], index=2)
+        publish_mode = st.selectbox("Yayımlama rejimi", ["Hazırla, yayımlama", "Hazırla və seçilmiş görünmə ilə yüklə"], index=1)
         schedule = st.checkbox("Təyin olunmuş vaxtda yayımlama (əlavə quraşdırma tələb edir)", value=False, disabled=True)
     durations = {"30 saniyə": "30", "50 saniyə": "50", "1 dəqiqə": "60", "3 dəqiqə": "180", "5 dəqiqə": "300", "10 dəqiqə 1 saniyə": "601"}
     languages = {"Azərbaycan dili": "az", "English": "en", "Türkçe": "tr"}
