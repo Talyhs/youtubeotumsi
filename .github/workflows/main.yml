@@ -20,7 +20,7 @@ on:
         required: true
         type: choice
         options: [az, en, tr]
-        default: az
+        default: en
       duration:
         description: "Hədəf müddət (saniyə)"
         required: true
@@ -88,7 +88,7 @@ jobs:
     timeout-minutes: 60
     env:
       VIDEO_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
-      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'tr' }}
+      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'en' }}
       TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
       VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
       VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'auto' }}
@@ -181,7 +181,7 @@ jobs:
           FLIKI_API_KEY: ${{ secrets.FLIKI_API_KEY }}
           FLIKI_VOICE_ID: ${{ secrets.FLIKI_VOICE_ID }}
           FLIKI_VOICE_STYLE_ID: ${{ secrets.FLIKI_VOICE_STYLE_ID }}
-          VOICE_PROVIDER: kokoro
+          VOICE_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.language != 'en' && 'edge' || 'kokoro' }}
           KOKORO_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'am_michael' || 'af_heart' }}
           KOKORO_MODEL_PATH: .cache/kokoro/kokoro-v1.0.onnx
           KOKORO_VOICES_PATH: .cache/kokoro/voices-v1.0.bin
