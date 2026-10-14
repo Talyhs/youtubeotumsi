@@ -133,6 +133,7 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID || 'UC7_pFbnnuMWT_US47_D6MDA' }}
           PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'upload' }}
         run: |
           python - <<'PY'
@@ -157,6 +158,7 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID || 'UC7_pFbnnuMWT_US47_D6MDA' }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
           ELEVENLABS_MODEL_ID: eleven_v3

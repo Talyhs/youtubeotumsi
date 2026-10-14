@@ -48,7 +48,10 @@ if PRIVACY not in {"public", "private", "unlisted"}:
         "YOUTUBE_PRIVACY_STATUS must be public, private or unlisted."
     )
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 YOUTUBE_CATEGORY = "27"
 HEADERS = {"User-Agent": "TalyhsYouTubeAutomation/1.0"}
 TIMEOUT = 60
@@ -181,6 +184,11 @@ def check_configuration():
             )
 
     print("Configuration validated.")
+    if PUBLISH_MODE == "upload":
+        # Fail closed before spending time rendering if OAuth is not authorized
+        # for the explicitly selected channel.
+        youtube = get_youtube_service()
+        verify_selected_youtube_channel(youtube)
     print("Gemini enabled:", bool(GEMINI_KEY))
     print("Pexels enabled:", bool(PEXELS_KEY))
     print("Pixabay enabled:", bool(PIXABAY_KEY))
@@ -1229,9 +1237,62 @@ def get_youtube_service():
     )
 
 
+def verify_selected_youtube_channel(youtube):
+    """List OAuth-visible channels and fail closed unless the configured channel is exact."""
+    target_id = os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
+
+    try:
+        response = youtube.channels().list(
+            part="snippet",
+            mine=True,
+            maxResults=50,
+        ).execute()
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not verify the YouTube channel through channels.list(mine=true). "
+            "The OAuth token may need to be re-authorized with both youtube.upload "
+            "and youtube.readonly scopes. Publishing is blocked. Details: " + str(exc)
+        ) from exc
+
+    channels = response.get("items", [])
+    if not channels:
+        raise RuntimeError(
+            "YouTube API returned no channels for this OAuth identity. "
+            "Re-authorize with the intended second channel selected. Publishing is blocked."
+        )
+
+    print("OAuth-visible YouTube channels:")
+    for channel in channels:
+        snippet = channel.get("snippet", {})
+        print(f" - {snippet.get('title', '(untitled)')} | ID: {channel.get('id', '')}")
+
+    if not target_id:
+        raise RuntimeError(
+            "Publishing blocked: channel list shown above. Set the GitHub repository "
+            "variable YOUTUBE_CHANNEL_ID to the exact ID of the second channel, then rerun."
+        )
+
+    selected = next((item for item in channels if item.get("id") == target_id), None)
+    if selected is None:
+        available = ", ".join(
+            f"{item.get('snippet', {}).get('title', '(untitled)')} [{item.get('id', '')}]"
+            for item in channels
+        )
+        raise RuntimeError(
+            "Publishing blocked: configured YOUTUBE_CHANNEL_ID does not match any "
+            "channel returned by channels.list(mine=true). The OAuth session may be "
+            "authorized for a different channel. Visible channels: " + available
+        )
+
+    title = selected.get("snippet", {}).get("title", "(untitled)")
+    print(f"Confirmed target channel: {title} | ID: {target_id}")
+    return selected
+
+
 def upload_video(title, description, tags, clips):
     print("7. Uploading MP4 to YouTube...")
     youtube = get_youtube_service()
+    verify_selected_youtube_channel(youtube)
 
     full_description = (
         description.strip()
