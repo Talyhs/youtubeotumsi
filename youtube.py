@@ -36,6 +36,7 @@ LANGUAGE = os.getenv("VIDEO_LANGUAGE", "az").strip().lower()
 VOICE_GENDER = os.getenv("VOICE_GENDER", "auto").strip().lower()
 VOICE_MAP = {"az": {"auto": "az-AZ-BabekNeural", "male": "az-AZ-BabekNeural", "female": "az-AZ-BanuNeural"}, "en": {"auto": "en-US-GuyNeural", "male": "en-US-GuyNeural", "female": "en-US-JennyNeural"}, "tr": {"auto": "tr-TR-AhmetNeural", "male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"}}
 VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"]).get(VOICE_GENDER, VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"])["auto"])
+KOKORO_VOICE = os.getenv("KOKORO_VOICE", "").strip() or ({"male": "am_michael", "female": "af_heart"}.get(VOICE_GENDER, "af_heart"))
 VIDEO_FORMAT = os.getenv("VIDEO_FORMAT", "horizontal").strip().lower()
 ADD_SUBTITLES = os.getenv("ADD_SUBTITLES", "true").strip().lower() == "true"
 CREATE_THUMBNAIL = os.getenv("CREATE_THUMBNAIL", "true").strip().lower() == "true"
@@ -619,8 +620,8 @@ def create_voice_and_subtitles(script):
     fliki_voice_id = os.getenv("FLIKI_VOICE_ID", "").strip()
     fliki_style_id = os.getenv("FLIKI_VOICE_STYLE_ID", "").strip()
 
-    if provider not in {"auto", "elevenlabs", "edge", "fliki"}:
-        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs, fliki or edge.")
+    if provider not in {"auto", "elevenlabs", "edge", "fliki", "kokoro"}:
+        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs, edge, fliki or kokoro.")
     if provider == "fliki" and not (fliki_key and fliki_voice_id):
         raise RuntimeError("Fliki seçilib, amma FLIKI_API_KEY və FLIKI_VOICE_ID GitHub Secrets-də yoxdur.")
 
@@ -737,50 +738,90 @@ def create_voice_and_subtitles(script):
                 "Təbii tələffüzü qorumaq üçün səs sürətləndirilmir."
             )
 
-    if not use_elevenlabs:
-        print(f"4. Edge TTS ilə səsləndirmə hazırlanır ({VOICE})...")
-        async def synthesize():
-            communicate = edge_tts.Communicate(script, VOICE, rate="+0%")
-            await communicate.save(str(AUDIO_FILE))
+    if not use_elevenlabs and provider != "fliki":
+        if provider == "kokoro":
+            if LANGUAGE not in {"en", "english"}:
+                raise RuntimeError("Kokoro voice is configured for English. Set VIDEO_LANGUAGE=en.")
+            from kokoro_onnx import Kokoro
+            import soundfile as sf
 
-        try:
-            # Edge TTS may return HTTP 403 on hosted runners. Retry once, then
-            # use the locally installed espeak-ng engine so the scheduled job
-            # can still produce a video instead of failing before upload.
+            model_path = Path(os.getenv("KOKORO_MODEL_PATH", str(BASE / ".cache" / "kokoro" / "kokoro-v1.0.onnx")))
+            voices_path = Path(os.getenv("KOKORO_VOICES_PATH", str(BASE / ".cache" / "kokoro" / "voices-v1.0.bin")))
+            if not model_path.is_file() or not voices_path.is_file():
+                raise RuntimeError(
+                    "Kokoro model files are missing. Download kokoro-v1.0.onnx and "
+                    "voices-v1.0.bin into .cache/kokoro (see workflow model-download step)."
+                )
+
+            print(f"4. Kokoro ONNX ilə pulsuz yerli AI səsləndirmə hazırlanır ({KOKORO_VOICE})...")
+            wav_file = WORK / "voiceover_kokoro.wav"
+            tts = Kokoro(str(model_path), str(voices_path))
             try:
-                asyncio.run(synthesize())
-            except Exception as edge_error:
-                print(
-                    f"WARNING: Edge TTS failed ({edge_error}). "
-                    "Trying local espeak-ng fallback."
+                samples, sample_rate = tts.create(
+                    script,
+                    voice=KOKORO_VOICE,
+                    speed=float(os.getenv("KOKORO_SPEED", "1.0")),
+                    lang="en-us",
                 )
-                wav_file = WORK / "voiceover_fallback.wav"
-                fallback_voice = "en-us" if LANGUAGE == "en" else "tr"
-                run([
-                    "espeak-ng", "-v", fallback_voice, "-s", "145",
-                    "-w", str(wav_file), script
-                ])
-                if not wav_file.exists() or wav_file.stat().st_size < 1000:
-                    raise RuntimeError("espeak-ng did not create a valid fallback WAV.")
-                run([
-                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
-                    str(AUDIO_FILE)
-                ])
-                wav_file.unlink(missing_ok=True)
-                print(
-                    "WARNING: Local fallback narration is active. "
-                    "It may not pronounce Azerbaijani as naturally as neural TTS."
-                )
-        except Exception as exc:
-            raise RuntimeError(
-                f"Edge TTS and local fallback both failed: {exc}"
-            ) from exc
+                sf.write(str(wav_file), samples, sample_rate, subtype="PCM_16")
+            finally:
+                try:
+                    tts.voices.close()
+                except Exception:
+                    pass
+
+            if not wav_file.is_file() or wav_file.stat().st_size < 1000:
+                raise RuntimeError("Kokoro did not create a valid WAV audio file.")
+            run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
+                str(AUDIO_FILE),
+            ])
+            wav_file.unlink(missing_ok=True)
+        else:
+            print(f"4. Edge TTS ilə səsləndirmə hazırlanır ({VOICE})...")
+            async def synthesize():
+                communicate = edge_tts.Communicate(script, VOICE, rate="+0%")
+                await communicate.save(str(AUDIO_FILE))
+
+            try:
+                # Edge TTS may return HTTP 403 on hosted runners. Retry once, then
+                # use the locally installed espeak-ng engine so the scheduled job
+                # can still produce a video instead of failing before upload.
+                try:
+                    asyncio.run(synthesize())
+                except Exception as edge_error:
+                    print(
+                        f"WARNING: Edge TTS failed ({edge_error}). "
+                        "Trying local espeak-ng fallback."
+                    )
+                    wav_file = WORK / "voiceover_fallback.wav"
+                    fallback_voice = "en-us" if LANGUAGE == "en" else "tr"
+                    run([
+                        "espeak-ng", "-v", fallback_voice, "-s", "145",
+                        "-w", str(wav_file), script
+                    ])
+                    if not wav_file.exists() or wav_file.stat().st_size < 1000:
+                        raise RuntimeError("espeak-ng did not create a valid fallback WAV.")
+                    run([
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
+                        str(AUDIO_FILE)
+                    ])
+                    wav_file.unlink(missing_ok=True)
+                    print(
+                        "WARNING: Local fallback narration is active. "
+                        "It may not pronounce Azerbaijani as naturally as neural TTS."
+                    )
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Edge TTS and local fallback both failed: {exc}"
+                ) from exc
 
         if not AUDIO_FILE.exists() or AUDIO_FILE.stat().st_size == 0:
             raise RuntimeError("TTS did not create an audio file.")
 
-        # Keep legacy Edge TTS duration fitting; ElevenLabs audio is never time-stretched.
+        # Fit generated narration to the configured target duration.
         target_duration = float(os.getenv("TARGET_VIDEO_SECONDS", "193"))
         original_duration = get_audio_duration()
         tempo = original_duration / target_duration
@@ -812,8 +853,7 @@ def create_voice_and_subtitles(script):
         ])
         adjusted_audio.replace(AUDIO_FILE)
         audio_duration = get_audio_duration()
-        print(f"Edge TTS səs müddəti: {audio_duration:.1f} saniyə.")
-
+        print(f"{provider.upper()} TTS səs müddəti: {audio_duration:.1f} saniyə.")
 
     def ass_stamp(seconds):
         cs = max(0, int(seconds * 100))
