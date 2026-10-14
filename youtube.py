@@ -159,8 +159,6 @@ def check_configuration():
 
     if PUBLISH_MODE == "upload" and not os.getenv("TOKEN_JSON", "").strip():
         missing.append("TOKEN_JSON")
-    if PUBLISH_MODE == "upload" and not os.getenv("YOUTUBE_CHANNEL_ID", "").strip():
-        missing.append("GitHub Repository Variable YOUTUBE_CHANNEL_ID (target channel ID)")
 
     if not (PEXELS_KEY or PIXABAY_KEY):
         missing.append(
@@ -1242,11 +1240,6 @@ def get_youtube_service():
 def verify_selected_youtube_channel(youtube):
     """List OAuth-visible channels and fail closed unless the configured channel is exact."""
     target_id = os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
-    if not target_id:
-        raise RuntimeError(
-            "Publishing blocked: set the GitHub repository variable "
-            "YOUTUBE_CHANNEL_ID to the confirmed second channel's channel ID."
-        )
 
     try:
         response = youtube.channels().list(
@@ -1272,6 +1265,12 @@ def verify_selected_youtube_channel(youtube):
     for channel in channels:
         snippet = channel.get("snippet", {})
         print(f" - {snippet.get('title', '(untitled)')} | ID: {channel.get('id', '')}")
+
+    if not target_id:
+        raise RuntimeError(
+            "Publishing blocked: channel list shown above. Set the GitHub repository "
+            "variable YOUTUBE_CHANNEL_ID to the exact ID of the second channel, then rerun."
+        )
 
     selected = next((item for item in channels if item.get("id") == target_id), None)
     if selected is None:
