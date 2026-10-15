@@ -2,7 +2,7 @@ name: Windows Studio checks
 
 on:
   push:
-    branches: [feature/talyhs-studio-windows, feature/talyhs-studio-full-suite]
+    branches: [feature/talyhs-studio-windows, feature/talyhs-studio-release]
   pull_request:
     branches: [main]
   workflow_dispatch:
