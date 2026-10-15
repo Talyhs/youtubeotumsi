@@ -289,6 +289,17 @@ def count_script_words(script):
 
 
 def generate_script(topic):
+    override_file = os.getenv("SCRIPT_OVERRIDE_FILE", "").strip()
+    if override_file:
+        override_path = Path(override_file)
+        if not override_path.is_file():
+            raise RuntimeError(f"SCRIPT_OVERRIDE_FILE does not exist: {override_path}")
+        override_script = override_path.read_text(encoding="utf-8").strip()
+        if not override_script:
+            raise RuntimeError("SCRIPT_OVERRIDE_FILE is empty.")
+        print("Using local script override; Gemini script generation skipped.")
+        return override_script
+
     language_names = {"az": "Azerbaijani", "en": "English", "tr": "Turkish"}
     language_name = language_names.get(LANGUAGE, "Azerbaijani")
     target_seconds = max(30, int(os.getenv("TARGET_VIDEO_SECONDS", "193")))

@@ -1,0 +1,56 @@
+name: Build Talyhs Studio for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/talyhs-studio-release]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+      - name: Create build environment
+        shell: cmd
+        run: |
+          py -3.11 -m venv .venv
+          call .venv\Scripts\activate.bat
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-desktop.txt
+      - name: Check syntax and tests
+        shell: cmd
+        run: |
+          call .venv\Scripts\activate.bat
+          python -m py_compile app.py youtube.py desktop_app.py studio\media.py studio\ollama.py studio\publish.py studio\state.py studio\stats.py
+          pytest -q tests
+      - name: Build Windows desktop app
+        shell: cmd
+        run: |
+          call .venv\Scripts\activate.bat
+          call build_windows.bat
+        env:
+          PYTHONUTF8: "1"
+      - name: Package build folder
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/TalyhsStudio/TalyhsStudio.exe")) {
+            throw "TalyhsStudio.exe was not created."
+          }
+          Compress-Archive -Path "dist/TalyhsStudio/*" -DestinationPath "TalyhsStudio-Windows.zip" -Force
+      - name: Upload Windows app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalyhsStudio-Windows
+          path: TalyhsStudio-Windows.zip
+          if-no-files-found: error
+          retention-days: 14

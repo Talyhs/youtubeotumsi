@@ -11,10 +11,16 @@ services:
         sync: false
       - key: GH_TOKEN
         sync: false
+      - key: YOUTUBE_TOKEN_JSON
+        sync: false
       - key: GITHUB_REPOSITORY
         value: Talyhs/youtubeotumsi
       - key: GITHUB_WORKFLOW_FILE
         value: main.yml
+      - key: GITHUB_BRANCH
+        value: main
+      - key: STUDIO_DB_PATH
+        value: studio_calendar.sqlite3
 
   - type: web
     name: talyhs-whatsapp-control
