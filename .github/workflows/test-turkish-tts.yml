@@ -1,0 +1,83 @@
+name: Test Turkish TTS Voices
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-voices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Turkish TTS engines
+        run: |
+          python -m pip install --upgrade pip
+          pip install edge-tts
+          pip install ema-lightning --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Generate Turkish male voice samples
+        run: |
+          python - <<'PY'
+          import asyncio
+          from pathlib import Path
+          import subprocess
+
+          sample = (
+              "Merhaba! Bugün beynimiz hakkında şaşırtıcı bir bilgi öğreneceğiz. "
+              "Beynimiz, biz dinlenirken bile vücudumuzdaki birçok önemli işi yönetmeye devam eder. "
+              "Yeni bilgiler öğrenmek ve merak etmek, zihnimizi canlı tutar."
+          )
+
+          async def make_edge():
+              import edge_tts
+              await edge_tts.Communicate(
+                  sample,
+                  voice="tr-TR-AhmetNeural",
+                  rate="+0%",
+                  pitch="+0Hz",
+              ).save("edge_ahmet.mp3")
+
+          asyncio.run(make_edge())
+          if not Path("edge_ahmet.mp3").is_file() or Path("edge_ahmet.mp3").stat().st_size < 1000:
+              raise RuntimeError("Edge TTS sample was not created.")
+
+          from ema_lightning import EMA
+          tts = EMA()
+          tts.say(sample, path="ema_turkish.wav")
+          if not Path("ema_turkish.wav").is_file() or Path("ema_turkish.wav").stat().st_size < 1000:
+              raise RuntimeError("EMA Lightning sample was not created.")
+
+          subprocess.run([
+              "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+              "-i", "ema_turkish.wav", "-codec:a", "libmp3lame", "-q:a", "3",
+              "ema_turkish.mp3"
+          ], check=True)
+
+          for filename in ("edge_ahmet.mp3", "ema_turkish.mp3"):
+              print(f"CREATED {filename}: {Path(filename).stat().st_size} bytes")
+          PY
+
+      - name: Upload sample audio files
+        uses: actions/upload-artifact@v4
+        with:
+          name: turkish-tts-samples
+          path: |
+            edge_ahmet.mp3
+            ema_turkish.mp3
+          if-no-files-found: error
+          retention-days: 7
