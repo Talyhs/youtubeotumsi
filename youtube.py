@@ -31,13 +31,13 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
-TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "10 maraqlı fakt"
-LANGUAGE = os.getenv("VIDEO_LANGUAGE", "az").strip().lower()
+TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "İlginç bilimsel gerçekler"
+LANGUAGE = os.getenv("VIDEO_LANGUAGE", "tr").strip().lower()
 VOICE_GENDER = os.getenv("VOICE_GENDER", "auto").strip().lower()
 VOICE_MAP = {"az": {"auto": "az-AZ-BabekNeural", "male": "az-AZ-BabekNeural", "female": "az-AZ-BanuNeural"}, "en": {"auto": "en-US-GuyNeural", "male": "en-US-GuyNeural", "female": "en-US-JennyNeural"}, "tr": {"auto": "tr-TR-AhmetNeural", "male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"}}
 VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"]).get(VOICE_GENDER, VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"])["auto"])
 KOKORO_VOICE = os.getenv("KOKORO_VOICE", "").strip() or ({"male": "am_michael", "female": "af_heart"}.get(VOICE_GENDER, "af_heart"))
-VIDEO_FORMAT = os.getenv("VIDEO_FORMAT", "horizontal").strip().lower()
+VIDEO_FORMAT = os.getenv("VIDEO_FORMAT", "vertical").strip().lower()
 ADD_SUBTITLES = os.getenv("ADD_SUBTITLES", "true").strip().lower() == "true"
 CREATE_THUMBNAIL = os.getenv("CREATE_THUMBNAIL", "true").strip().lower() == "true"
 PUBLISH_MODE = os.getenv("PUBLISH_MODE", "upload").strip().lower()
@@ -54,81 +54,47 @@ YOUTUBE_CATEGORY = "27"
 HEADERS = {"User-Agent": "TalyhsYouTubeAutomation/1.0"}
 TIMEOUT = 60
 
-# Daily topic rotation in Azerbaijan time; topics cycle only after 30 days.
+# Turkish-language topic rotation; English queries are only for finding relevant stock footage.
 DAILY_TOPICS = [
-    ("Kosmos və planetlər haqqında", ["space planets galaxy", "astronaut outer space", "solar system stars"]),
-    ("Okean və dənizlər haqqında", ["deep ocean sea life", "underwater coral reef", "ocean waves marine animals"]),
-    ("İnsan bədəni haqqında", ["human body science", "human brain medical animation", "heart anatomy educational"]),
-    ("Heyvanlar aləmi haqqında", ["wild animals nature", "animal behavior wildlife", "birds mammals nature"]),
-    ("Dünya və təbiət möcüzələri haqqında", ["natural wonders landscape", "waterfalls mountains nature", "volcano forest nature"]),
-    ("Tarixdən maraqlı hadisələr haqqında", ["ancient civilization ruins", "historical artifacts museum", "ancient architecture"]),
-    ("Elm və fizika haqqında", ["science laboratory experiment", "physics experiment education", "scientist laboratory"]),
-    ("Texnologiya və süni intellekt haqqında", ["artificial intelligence technology", "robotics computer technology", "futuristic technology"]),
-    ("Qədim sivilizasiyalar haqqında", ["ancient civilization pyramids", "archaeology excavation", "ancient ruins"]),
-    ("Qida və gündəlik həyat haqqında", ["food science kitchen", "fresh food market", "cooking ingredients closeup"]),
-    ("Yuxu və beyin haqqında", ["sleeping person night", "brain neuroscience animation", "dream sleep science"]),
-    ("Dünyanın ən qəribə yerləri haqqında", ["unusual places on earth", "strange landscapes travel", "remote island aerial"]),
-    ("İxtiralar və kəşflər haqqında", ["scientific inventions workshop", "inventions museum", "engineering innovation"]),
-    ("Riyaziyyat və rəqəmlər haqqında", ["mathematics numbers classroom", "geometry equations writing", "numbers data visualization"]),
-    ("Bitkilər və meşələr haqqında", ["forest plants closeup", "tropical rainforest wildlife", "flowers growing time lapse"]),
-    ("Hava və iqlim haqqında", ["weather clouds storm", "lightning thunderstorm", "climate nature landscape"]),
-    ("İnsan psixologiyası haqqında", ["people thinking psychology", "human behavior crowd", "person reflecting window"]),
-    ("Gündəlik əşyaların sirri haqqında", ["everyday objects close up", "household items macro", "manufacturing everyday products"]),
-    ("Dünya rekordları haqqında", ["world record sports action", "extreme nature records", "largest structures aerial"]),
-    ("Məşhur alimlər və kəşflər haqqında", ["scientist working laboratory", "science history books", "research microscope laboratory"]),
-    ("Günəş və ulduzlar haqqında", ["sun solar flare space", "stars night sky", "telescope astronomy observatory"]),
-    ("Quşlar haqqında", ["birds flying wildlife", "eagle in flight nature", "colorful birds close up"]),
-    ("Həşəratlar haqqında", ["insects macro photography", "bees pollinating flowers", "butterfly macro nature"]),
-    ("İnsan duyğuları haqqında", ["human facial expressions", "people emotions portrait", "person smiling thoughtful"]),
-    ("Nəqliyyat və maşınlar haqqında", ["modern transport cars trains", "airplane flying sky", "electric vehicle technology"]),
-    ("Yer kürəsinin geologiyası haqqında", ["rock formations geology", "volcano lava eruption", "mountain geology landscape"]),
-    ("Dünya mədəniyyətləri haqqında", ["world cultures traditional art", "traditional architecture travel", "cultural festival people"]),
-    ("Dəniz canlıları haqqında", ["marine animals underwater", "dolphins swimming ocean", "sea turtles coral reef"]),
-    ("İşıq və optika haqqında", ["light prism rainbow experiment", "optics science experiment", "laser light laboratory"]),
-    ("Gündəlik elmi faktlar haqqında", ["everyday science experiment", "science facts demonstration", "macro objects scientific"]),
+    ("Uzay ve gezegenler hakkında şaşırtıcı gerçekler", ["space planets galaxy", "astronaut outer space", "solar system stars"]),
+    ("Okyanusun derinliklerinden ilginç bilgiler", ["deep ocean sea life", "underwater coral reef", "ocean waves marine animals"]),
+    ("İnsan vücudu hakkında şaşırtıcı gerçekler", ["human body science", "human brain medical animation", "heart anatomy educational"]),
+    ("Hayvanlar dünyasının bilinmeyen sırları", ["wild animals nature", "animal behavior wildlife", "birds mammals nature"]),
+    ("Dünyanın doğal harikaları", ["natural wonders landscape", "waterfalls mountains nature", "volcano forest nature"]),
+    ("Tarihten şaşırtıcı olaylar", ["ancient civilization ruins", "historical artifacts museum", "ancient architecture"]),
+    ("Bilim ve fizik hakkında ilginç gerçekler", ["science laboratory experiment", "physics experiment education", "scientist laboratory"]),
+    ("Yapay zekâ ve teknoloji hakkında bilgiler", ["artificial intelligence technology", "robotics computer technology", "futuristic technology"]),
+    ("Antik uygarlıkların gizemleri", ["ancient civilization pyramids", "archaeology excavation", "ancient ruins"]),
+    ("Yiyecekler ve günlük yaşam hakkında bilimsel gerçekler", ["food science kitchen", "fresh food market", "cooking ingredients closeup"]),
+    ("Uyku ve beynimiz hakkında ilginç bilgiler", ["sleeping person night", "brain neuroscience animation", "dream sleep science"]),
+    ("Dünyanın en sıra dışı yerleri", ["unusual places on earth", "strange landscapes travel", "remote island aerial"]),
+    ("İnsanlık tarihini değiştiren icatlar", ["scientific inventions workshop", "inventions museum", "engineering innovation"]),
+    ("Sayılar ve matematik hakkında şaşırtıcı gerçekler", ["mathematics numbers classroom", "geometry equations writing", "numbers data visualization"]),
+    ("Bitkiler ve ormanların gizli dünyası", ["forest plants closeup", "tropical rainforest wildlife", "flowers growing time lapse"]),
+    ("Hava olayları ve iklim hakkında bilgiler", ["weather clouds storm", "lightning thunderstorm", "climate nature landscape"]),
+    ("İnsan psikolojisinin şaşırtıcı yönleri", ["people thinking psychology", "human behavior crowd", "person reflecting window"]),
+    ("Günlük eşyaların bilinmeyen hikâyeleri", ["everyday objects close up", "household items macro", "manufacturing everyday products"]),
+    ("Dünya rekorları ve sıra dışı başarılar", ["world record sports action", "extreme nature records", "largest structures aerial"]),
+    ("Ünlü bilim insanları ve keşifleri", ["scientist working laboratory", "science history books", "research microscope laboratory"]),
+    ("Güneş ve yıldızlar hakkında ilginç bilgiler", ["sun solar flare space", "stars night sky", "telescope astronomy observatory"]),
+    ("Kuşlar hakkında şaşırtıcı gerçekler", ["birds flying wildlife", "eagle in flight nature", "colorful birds close up"]),
+    ("Böceklerin gizemli dünyası", ["insects macro photography", "bees pollinating flowers", "butterfly macro nature"]),
+    ("İnsan duyguları nasıl çalışır?", ["human facial expressions", "people emotions portrait", "person smiling thoughtful"]),
+    ("Ulaşım ve otomobiller hakkında ilginç bilgiler", ["modern transport cars trains", "airplane flying sky", "electric vehicle technology"]),
+    ("Dünya'nın jeolojisi ve volkanlar", ["rock formations geology", "volcano lava eruption", "mountain geology landscape"]),
+    ("Dünya kültürlerinden şaşırtıcı gelenekler", ["world cultures traditional art", "traditional architecture travel", "cultural festival people"]),
+    ("Deniz canlılarının bilinmeyen özellikleri", ["marine animals underwater", "dolphins swimming ocean", "sea turtles coral reef"]),
+    ("Işık ve optik hakkında ilginç deneyler", ["light prism rainbow experiment", "optics science experiment", "laser light laboratory"]),
+    ("Günlük hayatta karşılaştığımız bilimsel gerçekler", ["everyday science experiment", "science facts demonstration", "macro objects scientific"]),
 ]
 
 def get_daily_topic():
-    """Choose a repeatable, distinct daily topic for each scheduled slot in Baku time."""
-    now = datetime.now(ZoneInfo("Asia/Baku"))
+    """Choose a distinct topic for each daily slot using Turkey local time."""
+    now = datetime.now(ZoneInfo("Europe/Istanbul"))
     day_index = now.timetuple().tm_yday - 1
     slot_index = 0 if now.hour < 12 else 1 if now.hour < 17 else 2
     index = (day_index * 3 + slot_index) % len(DAILY_TOPICS)
     topic, queries = DAILY_TOPICS[index]
-    if LANGUAGE == "tr":
-        turkish_topics = [
-            "Uzay ve gezegenler hakkında şaşırtıcı gerçekler",
-            "Okyanusun derinliklerinden ilginç bilgiler",
-            "İnsan vücudu hakkında şaşırtıcı gerçekler",
-            "Hayvanlar dünyasının bilinmeyen sırları",
-            "Dünyanın doğal harikaları",
-            "Tarihten şaşırtıcı olaylar",
-            "Bilim ve fizik hakkında ilginç gerçekler",
-            "Yapay zekâ ve teknoloji hakkında bilgiler",
-            "Antik uygarlıkların gizemleri",
-            "Yiyecekler ve günlük yaşam hakkında bilimsel gerçekler",
-            "Uyku ve beynimiz hakkında ilginç bilgiler",
-            "Dünyanın en sıra dışı yerleri",
-            "İnsanlık tarihini değiştiren icatlar",
-            "Sayılar ve matematik hakkında şaşırtıcı gerçekler",
-            "Bitkiler ve ormanların gizli dünyası",
-            "Hava olayları ve iklim hakkında bilgiler",
-            "İnsan psikolojisinin şaşırtıcı yönleri",
-            "Günlük eşyaların bilinmeyen hikâyeleri",
-            "Dünya rekorları ve sıra dışı başarılar",
-            "Ünlü bilim insanları ve keşifleri",
-            "Güneş ve yıldızlar hakkında ilginç bilgiler",
-            "Kuşlar hakkında şaşırtıcı gerçekler",
-            "Böceklerin gizemli dünyası",
-            "İnsan duyguları nasıl çalışır?",
-            "Ulaşım ve otomobiller hakkında ilginç bilgiler",
-            "Dünya'nın jeolojisi ve volkanlar",
-            "Dünya kültürlerinden şaşırtıcı gelenekler",
-            "Deniz canlılarının bilinmeyen özellikleri",
-            "Işık ve optik hakkında ilginç deneyler",
-            "Günlük hayatta karşılaştığımız bilimsel gerçekler",
-        ]
-        topic = turkish_topics[index]
     print(f"Daily topic ({now.isoformat()}): {topic}")
     return topic, queries
 
@@ -395,8 +361,8 @@ def search_pexels(query):
         params={
             "query": query,
             "orientation": "portrait" if VIDEO_FORMAT == "vertical" else "landscape",
-            "size": "medium",
-            "per_page": 8,
+            "size": "large",
+            "per_page": 12,
         },
         timeout=TIMEOUT,
     )
@@ -971,8 +937,8 @@ def make_video(clips, duration):
             "-t", f"{scene_duration:.3f}",
             "-vf",
             f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps},setsar=1",
-            "-an", "-c:v", "libx264", "-preset", "veryfast",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            "-an", "-c:v", "libx264", "-preset", "medium",
+            "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(output),
         ])
         normalized.append(output)
@@ -1020,7 +986,7 @@ def make_video(clips, duration):
             run([
                 melt, str(timeline_file),
                 "-consumer", f"avformat:{montage_file}",
-                "vcodec=libx264", "crf=21", "preset=veryfast",
+                "vcodec=libx264", "crf=18", "preset=medium",
                 "pix_fmt=yuv420p", "real_time=-1",
             ])
         except Exception as exc:
@@ -1040,8 +1006,8 @@ def make_video(clips, duration):
         run([
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-f", "concat", "-safe", "0", "-i", str(concat_file),
-            "-an", "-c:v", "libx264", "-preset", "veryfast",
-            "-crf", "21", "-pix_fmt", "yuv420p", "-r", str(fps),
+            "-an", "-c:v", "libx264", "-preset", "medium",
+            "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(fps),
             "-movflags", "+faststart", str(montage_file),
         ])
 
@@ -1060,7 +1026,7 @@ def make_video(clips, duration):
         "-vf", filter_arg,
         "-map", "0:v:0", "-map", "1:a:0",
         "-t", f"{float(duration):.3f}", "-r", str(fps),
-        "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
         "-shortest", "-movflags", "+faststart", str(VIDEO_FILE),
     ])
@@ -1317,6 +1283,16 @@ def upload_video(title, description, tags, clips):
 
 
 def main():
+    end_date = os.getenv("AUTOMATION_END_DATE", "").strip()
+    if end_date:
+        try:
+            expiry = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise RuntimeError("AUTOMATION_END_DATE must use YYYY-MM-DD.") from exc
+        turkey_today = datetime.now(ZoneInfo("Europe/Istanbul")).date()
+        if turkey_today > expiry:
+            print(f"One-year automation period ended on {expiry.isoformat()}; no video will be produced.")
+            return
     print("========================================")
     print(" TALYHS / YOUTUBE AUTOMATION")
     print("========================================")
