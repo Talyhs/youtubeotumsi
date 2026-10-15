@@ -33,7 +33,7 @@ PIXABAY_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
 MODEL = os.getenv("GEMINI_TEXT_MODEL", "").strip() or "gemini-3.8-flash"
 TOPIC = os.getenv("VIDEO_TOPIC", "").strip() or "İlginç bilimsel gerçekler"
 LANGUAGE = os.getenv("VIDEO_LANGUAGE", "tr").strip().lower()
-VOICE_GENDER = os.getenv("VOICE_GENDER", "auto").strip().lower()
+VOICE_GENDER = os.getenv("VOICE_GENDER", "male").strip().lower()
 VOICE_MAP = {"az": {"auto": "az-AZ-BabekNeural", "male": "az-AZ-BabekNeural", "female": "az-AZ-BanuNeural"}, "en": {"auto": "en-US-GuyNeural", "male": "en-US-GuyNeural", "female": "en-US-JennyNeural"}, "tr": {"auto": "tr-TR-AhmetNeural", "male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"}}
 VOICE = os.getenv("EDGE_TTS_VOICE", "").strip() or VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"]).get(VOICE_GENDER, VOICE_MAP.get(LANGUAGE, VOICE_MAP["az"])["auto"])
 KOKORO_VOICE = os.getenv("KOKORO_VOICE", "").strip() or ({"male": "am_michael", "female": "af_heart"}.get(VOICE_GENDER, "af_heart"))
@@ -759,26 +759,51 @@ def create_voice_and_subtitles(script):
                 except Exception as edge_error:
                     print(
                         f"WARNING: Edge TTS failed ({edge_error}). "
-                        "Trying local espeak-ng fallback."
+                        "Trying the free local EMA Lightning Turkish TTS fallback."
                     )
-                    wav_file = WORK / "voiceover_fallback.wav"
-                    fallback_voice = "en-us" if LANGUAGE == "en" else "tr"
-                    run([
-                        "espeak-ng", "-v", fallback_voice, "-s", "145",
-                        "-w", str(wav_file), script
-                    ])
-                    if not wav_file.exists() or wav_file.stat().st_size < 1000:
-                        raise RuntimeError("espeak-ng did not create a valid fallback WAV.")
-                    run([
-                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                        "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
-                        str(AUDIO_FILE)
-                    ])
-                    wav_file.unlink(missing_ok=True)
-                    print(
-                        "WARNING: Local fallback narration is active. "
-                        "It may not pronounce Azerbaijani as naturally as neural TTS."
-                    )
+                    wav_file = WORK / "voiceover_ema.wav"
+                    ema_ok = False
+                    if LANGUAGE == "tr":
+                        try:
+                            from ema_lightning import EMA
+
+                            ema = EMA()
+                            ema.say(script, path=str(wav_file))
+                            if not wav_file.is_file() or wav_file.stat().st_size < 1000:
+                                raise RuntimeError("EMA Lightning did not create a valid WAV.")
+                            run([
+                                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                                "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
+                                str(AUDIO_FILE)
+                            ])
+                            ema_ok = True
+                            print("EMA Lightning Turkish fallback narration created successfully.")
+                        except Exception as ema_error:
+                            print(f"WARNING: EMA Lightning fallback failed ({ema_error}); trying espeak-ng.")
+                    else:
+                        print("EMA Lightning fallback is Turkish-only; trying espeak-ng for this language.")
+
+                    if not ema_ok:
+                        wav_file = WORK / "voiceover_fallback.wav"
+                        fallback_voice = "en-us" if LANGUAGE == "en" else "tr"
+                        run([
+                            "espeak-ng", "-v", fallback_voice, "-s", "145",
+                            "-w", str(wav_file), script
+                        ])
+                        if not wav_file.exists() or wav_file.stat().st_size < 1000:
+                            raise RuntimeError("espeak-ng did not create a valid fallback WAV.")
+                        run([
+                            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                            "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
+                            str(AUDIO_FILE)
+                        ])
+                        wav_file.unlink(missing_ok=True)
+                        print(
+                            "WARNING: Local espeak-ng fallback narration is active. "
+                            "Its voice quality may be less natural than neural TTS."
+                        )
+                    else:
+                        wav_file.unlink(missing_ok=True)
             except Exception as exc:
                 raise RuntimeError(
                     f"Edge TTS and local fallback both failed: {exc}"
