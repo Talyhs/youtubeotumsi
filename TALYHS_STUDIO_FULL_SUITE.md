@@ -24,7 +24,7 @@ Render free filesystem may be ephemeral; calendar entries stored in SQLite may r
 ## Windows desktop EXE
 1. Open GitHub Actions in this repository.
 2. Choose “Build Talyhs Studio for Windows”.
-3. Select “Run workflow” on the full-suite branch.
+3. Select “Run workflow” on the release branch.
 4. When the run succeeds, open its Artifacts section and download TalyhsStudio-Windows.
 5. Extract the ZIP and launch TalyhsStudio.exe. Keep the engine directory beside it.
 6. Install FFmpeg and ensure ffmpeg and ffprobe work in Command Prompt. Put local .env and token.json beside the app only if needed. Never commit them.
