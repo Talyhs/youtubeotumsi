@@ -3,11 +3,11 @@ name: YouTube Video Automation
 on:
   schedule:
     - cron: "0 9 * * *"
-      timezone: "Asia/Baku"
+      timezone: "Europe/Istanbul"
     - cron: "0 14 * * *"
-      timezone: "Asia/Baku"
+      timezone: "Europe/Istanbul"
     - cron: "0 19 * * *"
-      timezone: "Asia/Baku"
+      timezone: "Europe/Istanbul"
   workflow_dispatch:
     inputs:
       topic:
@@ -20,13 +20,13 @@ on:
         required: true
         type: choice
         options: [az, en, tr]
-        default: en
+        default: tr
       duration:
         description: "Hədəf müddət (saniyə)"
         required: true
         type: choice
         options: ["30", "50", "55", "60", "180", "300", "601"]
-        default: "55"
+        default: "50"
       video_format:
         description: "Video formatı"
         required: true
@@ -38,7 +38,7 @@ on:
         required: true
         type: choice
         options: [auto, male, female]
-        default: auto
+        default: male
       stock_sources:
         description: "Stok mənbələri (vergüllə)"
         required: true
@@ -88,7 +88,7 @@ jobs:
     timeout-minutes: 60
     env:
       VIDEO_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
-      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'en' }}
+      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'tr' }}
       TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
       VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
       VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'auto' }}
@@ -97,6 +97,8 @@ jobs:
       CREATE_THUMBNAIL: ${{ github.event_name == 'workflow_dispatch' && inputs.thumbnail || 'true' }}
       ENABLE_SEO: ${{ github.event_name == 'workflow_dispatch' && inputs.seo || 'true' }}
       YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy || 'public' }}
+      AUTOMATION_END_DATE: '2027-10-14'
+      TIMEZONE: Europe/Istanbul
       PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'upload' }}
 
     steps:
@@ -181,8 +183,8 @@ jobs:
           FLIKI_API_KEY: ${{ secrets.FLIKI_API_KEY }}
           FLIKI_VOICE_ID: ${{ secrets.FLIKI_VOICE_ID }}
           FLIKI_VOICE_STYLE_ID: ${{ secrets.FLIKI_VOICE_STYLE_ID }}
-          VOICE_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.language != 'en' && 'edge' || 'kokoro' }}
-          KOKORO_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'am_michael' || 'af_heart' }}
+          VOICE_PROVIDER: edge
+          KOKORO_VOICE: am_michael
           KOKORO_MODEL_PATH: .cache/kokoro/kokoro-v1.0.onnx
           KOKORO_VOICES_PATH: .cache/kokoro/voices-v1.0.bin
           SD_WEBUI_URL: ${{ secrets.SD_WEBUI_URL }}
