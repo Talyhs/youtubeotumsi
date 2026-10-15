@@ -188,7 +188,7 @@ jobs:
           FLIKI_API_KEY: ${{ secrets.FLIKI_API_KEY }}
           FLIKI_VOICE_ID: ${{ secrets.FLIKI_VOICE_ID }}
           FLIKI_VOICE_STYLE_ID: ${{ secrets.FLIKI_VOICE_STYLE_ID }}
-          VOICE_PROVIDER: edge
+          VOICE_PROVIDER: ema
           KOKORO_VOICE: am_michael
           KOKORO_MODEL_PATH: .cache/kokoro/kokoro-v1.0.onnx
           KOKORO_VOICES_PATH: .cache/kokoro/voices-v1.0.bin
