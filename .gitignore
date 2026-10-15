@@ -10,3 +10,12 @@ token.json
 work/
 youtube_short.mp4
 *.log
+
+# Talyhs Studio local state and build outputs
+studio_data/
+dist/
+build/
+*.spec
+*.db
+*.sqlite
+*.sqlite3
