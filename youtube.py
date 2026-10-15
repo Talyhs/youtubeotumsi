@@ -586,8 +586,8 @@ def create_voice_and_subtitles(script):
     fliki_voice_id = os.getenv("FLIKI_VOICE_ID", "").strip()
     fliki_style_id = os.getenv("FLIKI_VOICE_STYLE_ID", "").strip()
 
-    if provider not in {"auto", "elevenlabs", "edge", "fliki", "kokoro"}:
-        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs, edge, fliki or kokoro.")
+    if provider not in {"auto", "elevenlabs", "edge", "fliki", "kokoro", "ema"}:
+        raise RuntimeError("VOICE_PROVIDER must be auto, elevenlabs, edge, fliki, kokoro or ema.")
     if provider == "fliki" and not (fliki_key and fliki_voice_id):
         raise RuntimeError("Fliki seçilib, amma FLIKI_API_KEY və FLIKI_VOICE_ID GitHub Secrets-də yoxdur.")
 
@@ -705,7 +705,27 @@ def create_voice_and_subtitles(script):
             )
 
     if not use_elevenlabs and provider != "fliki":
-        if provider == "kokoro":
+        if provider == "ema":
+            if LANGUAGE != "tr":
+                raise RuntimeError("EMA Lightning bu layihədə yalnız türk dili üçün aktivdir. VIDEO_LANGUAGE=tr seçin.")
+            from ema_lightning import EMA
+
+            print("4. EMA Lightning ilə türk dilində səsləndirmə hazırlanır (Edge TTS istifadə edilmir)...")
+            wav_file = WORK / "voiceover_ema.wav"
+            ema = EMA()
+            ema.say(script, path=str(wav_file))
+            if not wav_file.is_file() or wav_file.stat().st_size < 1000:
+                raise RuntimeError("EMA Lightning etibarlı WAV səs faylı yaratmadı.")
+            run([
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(wav_file), "-codec:a", "libmp3lame", "-q:a", "3",
+                str(AUDIO_FILE)
+            ])
+            wav_file.unlink(missing_ok=True)
+            if not AUDIO_FILE.is_file() or AUDIO_FILE.stat().st_size < 1000:
+                raise RuntimeError("EMA Lightning MP3 çevirməsi uğursuz oldu.")
+            print("EMA Lightning türk səsi hazırdır.")
+        elif provider == "kokoro":
             if LANGUAGE not in {"en", "english"}:
                 raise RuntimeError("Kokoro voice is configured for English. Set VIDEO_LANGUAGE=en.")
             from kokoro_onnx import Kokoro
