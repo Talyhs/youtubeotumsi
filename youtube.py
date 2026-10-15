@@ -474,15 +474,15 @@ def collect_clips(queries, wanted=5):
     candidates = []
     seen = set()
 
-    # Search terms should be English: stock libraries generally return much
-    # better results for English than for Azerbaijani topic strings.
-    topic_text = " ".join(str(q) for q in (queries or []))
+    # Stock libraries usually return stronger results for English queries.
+    # Keep fallback footage searches related to this video's actual topic.
+    primary_query = str((queries or ["science documentary"])[0]).strip()
     extra_queries = [
-        "human brain neuroscience",
-        "brain anatomy medical animation",
-        "neuroscience science laboratory",
-        "human thinking brain",
-        "medical science research",
+        f"{primary_query} cinematic",
+        f"{primary_query} close up",
+        f"{primary_query} documentary footage",
+        "educational documentary footage",
+        "cinematic science b-roll",
     ]
     all_queries = []
     for query in list(queries or []) + extra_queries:
