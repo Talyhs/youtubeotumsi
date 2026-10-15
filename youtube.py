@@ -256,6 +256,34 @@ def load_fallback_script():
     return script
 
 
+def load_pharaohs_fallback_script():
+    """Load the bundled Turkish documentary script if Gemini is unavailable."""
+    fallback_path = BASE / "sample_script_pharaohs_tr.txt"
+    if not fallback_path.exists():
+        raise RuntimeError(
+            "Gemini unavailable and Turkish pharaohs fallback script is missing: "
+            "sample_script_pharaohs_tr.txt"
+        )
+    script = fallback_path.read_text(encoding="utf-8").strip()
+    word_count = count_script_words(script)
+    if word_count < 900:
+        raise RuntimeError(
+            f"Turkish pharaohs fallback script is too short ({word_count} words)."
+        )
+    print(
+        f"WARNING: Gemini unavailable; using bundled Turkish pharaohs script "
+        f"({word_count} words)."
+    )
+    return script
+
+
+def is_pharaohs_topic(topic):
+    topic_lower = topic.lower()
+    return any(term in topic_lower for term in (
+        "firavun", "firon", "antik mısır", "antik misir", "pharaoh", "ancient egypt"
+    ))
+
+
 def count_script_words(script):
     return len(re.findall(r"\b[\wƏəIıİiÖöÜüĞğŞşÇç]+\b", script, flags=re.UNICODE))
 
@@ -292,11 +320,15 @@ Use an engaging opening, accurate facts, short natural sentences, and a concise 
 Do not invent statistics, citations or unsupported claims.
 Return only the narration, without markdown, title, URL or stage directions.
 """
+    fallback_used = False
     try:
         script = generate_text(prompt)
     except Exception as exc:
         print(f"Gemini script generation failed: {exc}")
-        if is_brain_short:
+        if LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
+            script = load_pharaohs_fallback_script()
+            fallback_used = True
+        elif is_brain_short:
             script = brain_short_fallback
             print("WARNING: Gemini əlçatan deyil; beyin mövzusu üçün daxili 50 saniyəlik Azərbaycan ssenarisi istifadə olunur.")
         elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
@@ -316,6 +348,10 @@ Return only the narration, without markdown, title, URL or stage directions.
             elif is_brain_short:
                 script = brain_short_fallback
                 word_count = count_script_words(script)
+            elif LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
+                script = load_pharaohs_fallback_script()
+                word_count = count_script_words(script)
+                fallback_used = True
             elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
                 script = load_fallback_script()
                 word_count = count_script_words(script)
@@ -326,6 +362,11 @@ Return only the narration, without markdown, title, URL or stage directions.
                 print(f"Correction unavailable, using built-in brain Shorts fallback: {exc}")
                 script = brain_short_fallback
                 word_count = count_script_words(script)
+            elif LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
+                print(f"Correction unavailable; using Turkish pharaohs fallback: {exc}")
+                script = load_pharaohs_fallback_script()
+                word_count = count_script_words(script)
+                fallback_used = True
             elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
                 print(f"Correction unavailable, using bundled fallback: {exc}")
                 script = load_fallback_script()
