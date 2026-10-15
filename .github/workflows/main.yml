@@ -31,8 +31,8 @@ on:
         description: "Üfüqi = adi YouTube video; şaquli = Shorts"
         required: true
         type: choice
-        options: [vertical, horizontal]
-        default: vertical
+        options: [horizontal, vertical]
+        default: horizontal
       voice:
         description: "Səsin cinsi — seçilən AI səs provayderində tətbiq olunur"
         required: true
