@@ -338,7 +338,7 @@ Return only the narration, without markdown, title, URL or stage directions.
         else:
             raise RuntimeError("Gemini əlçatan deyil və bu dil/müddət üçün ehtiyat ssenari yoxdur.") from exc
     word_count = count_script_words(script)
-    if not min_words <= word_count <= max_words:
+    if not fallback_used and not min_words <= word_count <= max_words:
         try:
             correction = f"Revise this {language_name} narration to {min_words}-{max_words} words. Preserve factual accuracy and return only narration text:\n\n{script}"
             corrected = generate_text(correction)
