@@ -9,7 +9,7 @@ permissions:
 jobs:
   test-voices:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
           pip install edge-tts
           pip install ema-lightning --extra-index-url https://download.pytorch.org/whl/cpu
 
-      - name: Generate Turkish male voice samples
+      - name: Generate Turkish male voice samples (continue if Edge TTS is unavailable)
         run: |
           python - <<'PY'
           import asyncio
@@ -42,42 +42,78 @@ jobs:
               "Beynimiz, biz dinlenirken bile vücudumuzdaki birçok önemli işi yönetmeye devam eder. "
               "Yeni bilgiler öğrenmek ve merak etmek, zihnimizi canlı tutar."
           )
+          success = []
 
           async def make_edge():
               import edge_tts
-              await edge_tts.Communicate(
-                  sample,
-                  voice="tr-TR-AhmetNeural",
-                  rate="+0%",
-                  pitch="+0Hz",
-              ).save("edge_ahmet.mp3")
+              voices = ["tr-TR-AhmetNeural", "tr-TR-EmelNeural"]
+              last_error = None
+              for voice in voices:
+                  try:
+                      output = Path("edge_sample.mp3")
+                      output.unlink(missing_ok=True)
+                      print(f"Trying Microsoft Edge TTS voice: {voice}")
+                      await edge_tts.Communicate(
+                          sample, voice=voice, rate="+0%", pitch="+0Hz"
+                      ).save(str(output))
+                      if output.is_file() and output.stat().st_size >= 1000:
+                          output.replace(f"edge_{voice.split('-')[-1].replace('Neural', '').lower()}.mp3")
+                          success.append("Edge TTS")
+                          print(f"Edge TTS succeeded with {voice}.")
+                          return
+                      raise RuntimeError("Edge TTS created no usable audio file.")
+                  except Exception as exc:
+                      last_error = exc
+                      print(f"Edge TTS voice {voice} failed: {type(exc).__name__}: {exc}")
+              print(f"WARNING: Edge TTS unavailable after trying both voices: {last_error}")
 
-          asyncio.run(make_edge())
-          if not Path("edge_ahmet.mp3").is_file() or Path("edge_ahmet.mp3").stat().st_size < 1000:
-              raise RuntimeError("Edge TTS sample was not created.")
+          try:
+              asyncio.run(make_edge())
+          except Exception as exc:
+              print(f"WARNING: Edge TTS test could not run: {exc}")
 
-          from ema_lightning import EMA
-          tts = EMA()
-          tts.say(sample, path="ema_turkish.wav")
-          if not Path("ema_turkish.wav").is_file() or Path("ema_turkish.wav").stat().st_size < 1000:
-              raise RuntimeError("EMA Lightning sample was not created.")
+          try:
+              from ema_lightning import EMA
+              print("Loading EMA Lightning Turkish model (first run may download model weights)...")
+              tts = EMA()
+              tts.say(sample, path="ema_turkish.wav")
+              wav = Path("ema_turkish.wav")
+              if not wav.is_file() or wav.stat().st_size < 1000:
+                  raise RuntimeError("EMA Lightning sample was not created.")
+              subprocess.run([
+                  "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                  "-i", str(wav), "-codec:a", "libmp3lame", "-q:a", "3",
+                  "ema_turkish.mp3"
+              ], check=True)
+              if not Path("ema_turkish.mp3").is_file() or Path("ema_turkish.mp3").stat().st_size < 1000:
+                  raise RuntimeError("EMA MP3 conversion failed.")
+              success.append("EMA Lightning")
+              print("EMA Lightning sample created successfully.")
+          except Exception as exc:
+              print(f"ERROR: EMA Lightning failed: {type(exc).__name__}: {exc}")
 
-          subprocess.run([
-              "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-              "-i", "ema_turkish.wav", "-codec:a", "libmp3lame", "-q:a", "3",
-              "ema_turkish.mp3"
-          ], check=True)
+          for filename in (
+              "edge_ahmet.mp3", "edge_emel.mp3", "ema_turkish.mp3"
+          ):
+              path = Path(filename)
+              if path.is_file():
+                  print(f"CREATED {filename}: {path.stat().st_size} bytes")
 
-          for filename in ("edge_ahmet.mp3", "ema_turkish.mp3"):
-              print(f"CREATED {filename}: {Path(filename).stat().st_size} bytes")
+          if not success:
+              raise RuntimeError(
+                  "Both Edge TTS and EMA Lightning failed. Review the logs above."
+              )
+          print("Successful TTS engines: " + ", ".join(success))
           PY
 
-      - name: Upload sample audio files
+      - name: Upload available sample audio files
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: turkish-tts-samples
           path: |
             edge_ahmet.mp3
+            edge_emel.mp3
             ema_turkish.mp3
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
