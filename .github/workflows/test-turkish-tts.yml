@@ -57,7 +57,7 @@ jobs:
                           sample, voice=voice, rate="+0%", pitch="+0Hz"
                       ).save(str(output))
                       if output.is_file() and output.stat().st_size >= 1000:
-                          output.replace(f"edge_{voice.split('-')[-1].replace('Neural', '').lower()}.mp3")
+                          output.replace("edge_ahmet.mp3" if "Ahmet" in voice else "edge_emel.mp3")
                           success.append("Edge TTS")
                           print(f"Edge TTS succeeded with {voice}.")
                           return
