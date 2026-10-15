@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import requests
 from google import genai
+from google.genai import types
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -153,14 +154,18 @@ def check_configuration():
     print("Pixabay enabled:", bool(PIXABAY_KEY))
 
 def generate_text(prompt):
-    client = genai.Client(api_key=GEMINI_KEY)
+    # Bound each network request so a busy Gemini endpoint cannot consume the whole Actions job.
+    client = genai.Client(
+        api_key=GEMINI_KEY,
+        http_options=types.HttpOptions(timeout=45000),
+    )
     last_error = None
 
     fallback_models = [
         item.strip()
         for item in os.getenv(
             "GEMINI_FALLBACK_MODELS",
-            "gemini-3.7-flash,gemini-3.5-flash-lite",
+            "gemini-2.5-flash,gemini-2.0-flash",
         ).split(",")
         if item.strip()
     ]
@@ -168,7 +173,7 @@ def generate_text(prompt):
 
     for model_name in models_to_try:
         print(f"Generating text with Gemini model: {model_name}")
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 response = client.models.generate_content(
                     model=model_name,
@@ -207,18 +212,18 @@ def generate_text(prompt):
                     break
 
                 if retryable:
-                    if attempt < 2:
-                        delay = (3, 8, 15)[attempt]
+                    if attempt < 1:
+                        delay = 4
                         print(
                             f"Gemini {model_name} temporarily failed "
-                            f"(attempt {attempt + 1}/3): {exc}. "
+                            f"(attempt {attempt + 1}/2): {exc}. "
                             f"Retrying in {delay}s."
                         )
                         time.sleep(delay)
                         continue
                     print(
                         f"Gemini {model_name} remained unavailable after "
-                        "3 attempts; trying the next model."
+                        "2 attempts; trying the next model."
                     )
                     break
 
