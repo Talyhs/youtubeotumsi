@@ -3,7 +3,7 @@ name: Build Talyhs Studio for Windows
 on:
   workflow_dispatch:
   push:
-    branches: [feature/talyhs-studio-full-suite]
+    branches: [feature/talyhs-studio-release]
 
 permissions:
   contents: read
