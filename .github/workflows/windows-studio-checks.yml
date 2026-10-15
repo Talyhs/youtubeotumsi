@@ -2,7 +2,7 @@ name: Windows Studio checks
 
 on:
   push:
-    branches: [feature/talyhs-studio-windows]
+    branches: [feature/talyhs-studio-windows, feature/talyhs-studio-full-suite]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -20,5 +20,5 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install --upgrade pip
       - run: python -m pip install pytest Pillow requests
-      - run: python -m py_compile desktop_app.py studio/*.py
+      - run: python -m py_compile app.py youtube.py desktop_app.py studio/*.py
       - run: pytest -q tests
