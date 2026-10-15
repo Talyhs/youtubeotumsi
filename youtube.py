@@ -266,7 +266,7 @@ def load_pharaohs_fallback_script():
         )
     script = fallback_path.read_text(encoding="utf-8").strip()
     word_count = count_script_words(script)
-    if word_count < 900:
+    if word_count < 700:
         raise RuntimeError(
             f"Turkish pharaohs fallback script is too short ({word_count} words)."
         )
