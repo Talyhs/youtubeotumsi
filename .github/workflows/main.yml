@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
     inputs:
       topic:
-        description: "Video mövzusu"
+        description: "Videoda danışılacaq mövzu və ya başlıq (məs: Fironlar: Antik Misirin sirləri)"
         required: true
         type: string
-        default: "Taksinin yaranma tarixi"
+        default: "Firavunlar: Antik Mısır'ın Gizemleri"
       language:
         description: "Video dili"
         required: true
@@ -22,23 +22,29 @@ on:
         options: [az, en, tr]
         default: tr
       duration:
-        description: "Hədəf müddət (saniyə)"
+        description: "Video müddəti — 600 saniyə = 10 dəqiqə"
         required: true
         type: choice
         options: ["30", "50", "55", "60", "180", "300", "600", "601"]
-        default: "50"
+        default: "600"
       video_format:
-        description: "Video formatı"
+        description: "Üfüqi = adi YouTube video; şaquli = Shorts"
         required: true
         type: choice
         options: [vertical, horizontal]
         default: vertical
       voice:
-        description: "Səs seçimi"
+        description: "Səsin cinsi — seçilən AI səs provayderində tətbiq olunur"
         required: true
         type: choice
-        options: [auto, male, female]
+        options: [male, female, auto]
         default: male
+      voice_provider:
+        description: "Səsləndirən AI — EMA yalnız türk dili; Kokoro ingilis dili; Edge çoxdilli neyron səs"
+        required: true
+        type: choice
+        options: [ema, edge, kokoro, elevenlabs, fliki, auto]
+        default: ema
       stock_sources:
         description: "Stok mənbələri (vergüllə)"
         required: true
@@ -63,17 +69,17 @@ on:
         options: ["true", "false"]
         default: "true"
       privacy:
-        description: "YouTube görünməsi"
+        description: "Yalnız publish=upload olduqda YouTube-a yüklənir"
         required: true
         type: choice
         options: [private, unlisted, public]
         default: public
       publish:
-        description: "Yükləmə davranışı"
+        description: "prepare = yalnız hazırla və faylı ver; upload = YouTube-a yüklə"
         required: true
         type: choice
         options: [prepare, upload]
-        default: upload
+        default: prepare
 
 permissions:
   contents: read
@@ -92,6 +98,7 @@ jobs:
       TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
       VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
       VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'male' }}
+      VOICE_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice_provider || 'ema' }}
       STOCK_SOURCES: ${{ github.event_name == 'workflow_dispatch' && inputs.stock_sources || 'Pixabay,Pexels' }}
       ADD_SUBTITLES: ${{ github.event_name == 'workflow_dispatch' && inputs.subtitles || 'true' }}
       CREATE_THUMBNAIL: ${{ github.event_name == 'workflow_dispatch' && inputs.thumbnail || 'true' }}
@@ -188,7 +195,7 @@ jobs:
           FLIKI_API_KEY: ${{ secrets.FLIKI_API_KEY }}
           FLIKI_VOICE_ID: ${{ secrets.FLIKI_VOICE_ID }}
           FLIKI_VOICE_STYLE_ID: ${{ secrets.FLIKI_VOICE_STYLE_ID }}
-          VOICE_PROVIDER: ema
+          VOICE_PROVIDER: ${{ env.VOICE_PROVIDER }}
           KOKORO_VOICE: am_michael
           KOKORO_MODEL_PATH: .cache/kokoro/kokoro-v1.0.onnx
           KOKORO_VOICES_PATH: .cache/kokoro/voices-v1.0.bin
