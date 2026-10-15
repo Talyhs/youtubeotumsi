@@ -91,7 +91,7 @@ jobs:
       VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'tr' }}
       TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
       VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
-      VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'auto' }}
+      VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'male' }}
       STOCK_SOURCES: ${{ github.event_name == 'workflow_dispatch' && inputs.stock_sources || 'Pixabay,Pexels' }}
       ADD_SUBTITLES: ${{ github.event_name == 'workflow_dispatch' && inputs.subtitles || 'true' }}
       CREATE_THUMBNAIL: ${{ github.event_name == 'workflow_dispatch' && inputs.thumbnail || 'true' }}
@@ -143,6 +143,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Install EMA Lightning Turkish TTS CPU fallback
+        run: |
+          # Use CPU-only PyTorch so the runner does not download CUDA packages.
+          pip install ema-lightning --extra-index-url https://download.pytorch.org/whl/cpu
 
       - name: Check Python syntax
         run: python -m py_compile youtube.py
