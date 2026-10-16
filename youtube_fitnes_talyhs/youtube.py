@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""English-language fitness YouTube Shorts automation starter."""
+"""Turkish-language fitness YouTube Shorts automation."""
 from __future__ import annotations
 import asyncio, json, os, random, re, shutil, subprocess, sys, time
 from pathlib import Path
@@ -20,18 +20,18 @@ TOKEN_JSON = os.getenv("TOKEN_JSON", "")
 CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
 MODE = os.getenv("PUBLISH_MODE", "prepare").lower()
 SECONDS = max(30, min(60, int(os.getenv("VIDEO_SECONDS", "45"))))
-VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-GuyNeural")
+VOICE = os.getenv("EDGE_TTS_VOICE", "tr-TR-EmelNeural")
 MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 ALLOW_PUBLIC = os.getenv("ALLOW_PUBLIC_UPLOAD", "NO").upper() == "YES"
 
 IDEAS = [
-    ("3 Push-Up Mistakes to Avoid", "push-up form and beginner fitness tips"),
-    ("A Simple Warm-Up Before Your Workout", "safe warm-up routine before exercise"),
-    ("Beginner Squat Form: 3 Quick Tips", "basic squat technique and safety"),
-    ("Why Rest Days Matter for Fitness", "recovery and rest days for beginners"),
-    ("Build a Workout Habit with Small Steps", "simple ways to build a consistent exercise habit"),
-    ("Stay Hydrated During Your Workout", "basic hydration reminders for exercise"),
-    ("No Gym? Try This Beginner Routine", "simple beginner bodyweight exercise routine"),
+    ("Şınavda Yapılan 3 Hata", "şınav tekniği ve başlangıç seviyesi fitness ipuçları"),
+    ("Antrenmandan Önce Basit Isınma", "egzersiz öncesi güvenli ısınma hareketleri"),
+    ("Squat Hareketini Doğru Yapmanın 3 Yolu", "başlangıç seviyesi squat tekniği ve güvenlik"),
+    ("Dinlenme Günleri Neden Önemli?", "fitness için toparlanma ve dinlenme"),
+    ("Küçük Adımlarla Egzersiz Alışkanlığı", "düzenli egzersiz alışkanlığı oluşturma"),
+    ("Antrenmanda Su İçmeyi Unutma", "egzersiz sırasında temel sıvı tüketimi hatırlatmaları"),
+    ("Spor Salonu Olmadan Evde Egzersiz", "başlangıç seviyesi vücut ağırlığı egzersizleri"),
 ]
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
@@ -55,11 +55,11 @@ def gen_json(prompt: str):
 def topic_data():
     title, topic = IDEAS[int(time.time() // 86400) % len(IDEAS)]
     data = gen_json(
-        "Write an original English YouTube Fitness Shorts script. Return valid JSON with keys "
+        "Türkçe, özgün bir YouTube Fitness Shorts metni yaz. Geçerli JSON döndür; anahtarlar: "
         "title, topic, script, search_terms (array), description, hashtags (array). "
-        f"Topic: {topic}. Duration {SECONDS} seconds. Natural spoken English, hook in first 2 seconds, "
-        "short sentences, safe general fitness education, brief call to action. No medical claims, "
-        "guaranteed results, or dangerous advice. Script around 80-115 words."
+        f"Konu: {topic}. Süre {SECONDS} saniye. Doğal konuşma Türkçesi, ilk 2 saniyede dikkat çekici giriş, "
+        "kısa cümleler, güvenli genel fitness eğitimi ve kısa çağrı. Tıbbi iddialar yok, "
+        "garantili sonuç veya tehlikeli tavsiye yok. Metin yaklaşık 80-115 Türkçe kelime olsun."
     )
     if data and all(k in data for k in ("title", "script", "search_terms")):
         data.setdefault("topic", topic); data.setdefault("description", "General fitness tips for everyday movement.")
@@ -67,14 +67,10 @@ def topic_data():
         return data
     return {
         "title": title, "topic": topic,
-        "script": "You do not need a perfect plan to get started. Begin with a small, safe step today. "
-                  "Warm up with a little easy movement before exercising. For squats, keep your feet about shoulder-width apart, "
-                  "move with control, and breathe naturally. If regular push-ups feel too difficult, try wall push-ups first. "
-                  "Never push through sharp pain, and choose movements that suit your current ability. "
-                  "Consistency matters more than trying to do everything in one day. Save this video and take one positive step today!",
-        "search_terms": ["fitness workout gym exercise training", "person exercising gym"],
-        "description": "Beginner-friendly fitness tips. Adapt exercises to your ability and stop if you feel pain.",
-        "hashtags": ["#fitness", "#shorts", "#workout", "#exercise"]
+        "script": "Mükemmel bir programa ihtiyacın yok; bugün küçük ve güvenli bir adımla başla. Egzersizden önce hafif hareketlerle ısın. Squat yaparken ayaklarını yaklaşık omuz genişliğinde tut, kontrollü hareket et ve doğal nefes al. Şınav zor geliyorsa duvar şınavıyla başlayabilirsin. Keskin ağrı hissedersen dur ve seviyene uygun hareketleri seç. Her şeyi bir günde yapmaya çalışmaktansa düzenli olmak daha önemlidir. Bu videoyu kaydet ve bugün kendin için iyi bir adım at!",
+        "search_terms": ["fitness antrenman spor salonu egzersiz", "evde egzersiz yapan kişi"],
+        "description": "Başlangıç seviyesine uygun fitness önerileri. Hareketleri kendi seviyene göre uyarlayın; ağrı hissederseniz durun.",
+        "hashtags": ["#fitness", "#shorts", "#antrenman", "#egzersiz"]
     }
 
 def parse_list(value):
