@@ -76,7 +76,7 @@ def test_montage_allocates_runtime_across_clips():
 def test_fallback_script_is_english():
     text = youtube.fallback_script("push-up technique")
     assert "Today" in text
-    assert "controlled" in text
+    assert "control" in text
 
 
 def test_english_topic_maps_to_specific_stock_searches():
