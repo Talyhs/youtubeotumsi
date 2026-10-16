@@ -50,7 +50,11 @@ def test_footage_queries_include_exact_topic_and_deduplicate():
     assert any("proper push-up form" in query for query in queries)
 
 
-def test_upload_requires_explicit_confirmation(monkeypatch, capsys):
-    monkeypatch.setattr(youtube, "MODE", "prepare")
-    youtube.upload("unused.mp4", {"title": "Test"}, [])
-    assert "not uploaded" in capsys.readouterr().out
+def test_upload_requires_explicit_confirmation(monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(youtube, "MODE", "upload")
+    monkeypatch.setattr(youtube, "CONFIRM_UPLOAD", False)
+    monkeypatch.setattr(youtube, "ALLOW_PUBLIC", True)
+    with pytest.raises(RuntimeError, match="explicit CONFIRM_UPLOAD"):
+        youtube.upload("unused.mp4", {"title": "Test"}, [])
