@@ -155,7 +155,7 @@ def topic_data():
             data["search_terms"] = [str(data["search_terms"])]
         data["search_terms"] = [str(x).strip() for x in data["search_terms"] if str(x).strip()][:5]
         if not data["search_terms"]:
-            data["search_terms"] = [f"{topic} exercise demonstration"]
+            data["search_terms"] = fallback_footage_terms(topic, data["title"])
         if not isinstance(data.get("hashtags"), list):
             data["hashtags"] = ["#fitness", "#shorts", "#antrenman"]
         data["hashtags"] = [str(x).strip() for x in data["hashtags"] if str(x).strip()][:8]
@@ -168,10 +168,30 @@ def topic_data():
     return {
         "title": title, "topic": topic,
         "script": fallback_script(topic),
-        "search_terms": [f"{topic} exercise demonstration", f"{topic} proper technique", "beginner fitness exercise form"],
+        "search_terms": fallback_footage_terms(topic, title),
         "description": f"{topic} hakkında başlangıç seviyesine uygun pratik öneriler. Kendine uygun hareketleri seç ve ağrı hissedersen dur.",
         "hashtags": ["#fitness", "#shorts", "#antrenman", "#egzersiz"]
     }
+
+def fallback_footage_terms(topic, title=""):
+    """Map common Turkish topic wording to English stock-search phrases."""
+    text = f"{title} {topic}".casefold()
+    if any(word in text for word in ("şınav", "push-up", "push up")):
+        return ["proper push-up form demonstration", "person doing push-ups side view", "push-up mistakes exercise technique"]
+    if any(word in text for word in ("squat", "çömel")):
+        return ["bodyweight squat proper form", "person demonstrating squat exercise", "squat technique side view"]
+    if any(word in text for word in ("ısınma", "ısın", "warm-up", "warmup")):
+        return ["beginner dynamic warm-up exercises", "athlete warming up before workout", "dynamic stretching exercise demonstration"]
+    if any(word in text for word in ("dinlen", "toparlan", "recovery", "rest day")):
+        return ["athlete resting after workout", "fitness recovery stretching", "rest day recovery exercise"]
+    if any(word in text for word in ("su iç", "hidrasyon", "susuz", "water")):
+        return ["athlete drinking water during workout", "hydration after exercise", "person drinking water at gym"]
+    if any(word in text for word in ("ekipmansız", "evde", "home workout", "ekipman")):
+        return ["beginner bodyweight workout at home", "person exercising at home no equipment", "home fitness workout demonstration"]
+    if any(word in text for word in ("karın", "abs", "plank")):
+        return ["proper plank exercise form", "beginner abdominal workout demonstration", "core exercise proper technique"]
+    return ["beginner fitness exercise demonstration", "person demonstrating correct workout form", "bodyweight exercise technique"]
+
 
 def parse_list(value):
     if isinstance(value, list): return [str(x).strip() for x in value if str(x).strip()]
