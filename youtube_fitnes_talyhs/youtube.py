@@ -259,13 +259,43 @@ def caption_chunks(words, max_words=5, max_chars=34):
     return chunks
 
 
-def make_ass_captions(script, duration, output_ass):
-    """Create large, high-contrast karaoke captions with a moving word highlight."""
-    words = script.split()
+def whisper_word_timings(audio_path):
+    """Return real word timestamps from Whisper when explicitly enabled."""
+    if os.getenv("USE_WHISPER_CAPTIONS", "NO").upper() != "YES":
+        return None
+    try:
+        import whisper
+        model = whisper.load_model(os.getenv("WHISPER_MODEL", "base"))
+        result = model.transcribe(str(audio_path), word_timestamps=True, fp16=False)
+        timed = []
+        for segment in result.get("segments", []):
+            for word in segment.get("words", []):
+                token = str(word.get("word", "")).strip()
+                if token:
+                    timed.append({
+                        "word": token,
+                        "start": max(0.0, float(word.get("start", 0))),
+                        "end": max(float(word.get("start", 0)) + 0.04, float(word.get("end", 0))),
+                    })
+        if timed:
+            print(f"Whisper word alignment enabled: {len(timed)} timed words.")
+            return timed
+        print("WARNING: Whisper returned no word timestamps; using estimated caption timing.")
+    except Exception as exc:
+        print(f"WARNING: Whisper alignment unavailable; using estimated caption timing. {exc}")
+    return None
+
+
+def make_ass_captions(script, duration, output_ass, audio_path=None):
+    """Create bold karaoke captions, using Whisper word timestamps when enabled."""
+    timed_words = whisper_word_timings(audio_path) if audio_path else None
+    if timed_words:
+        words = [item["word"] for item in timed_words]
+    else:
+        words = script.split()
     if not words:
         raise RuntimeError("Cannot create captions for an empty script")
     chunks = caption_chunks(words)
-    # Weight timing by word length so longer words stay highlighted slightly longer.
     weights = [max(2.0, min(10.0, len(re.sub(r"[^A-Za-z0-9]", "", w)) * 0.72)) for w in words]
     total_weight = sum(weights) or 1.0
     cursor_weight = 0.0
@@ -273,10 +303,16 @@ def make_ass_captions(script, duration, output_ass):
     events = []
     for chunk in chunks:
         chunk_weights = weights[cursor_word:cursor_word + len(chunk)]
-        start = duration * cursor_weight / total_weight
-        cursor_weight += sum(chunk_weights)
-        end = duration * cursor_weight / total_weight
-        # Split longer phrases into two balanced lines for phone screens.
+        if timed_words:
+            chunk_timing = timed_words[cursor_word:cursor_word + len(chunk)]
+            start = max(0.0, chunk_timing[0]["start"])
+            end = min(max(duration, start + 0.12), max(start + 0.12, chunk_timing[-1]["end"]))
+            word_durations = [max(0.04, item["end"] - item["start"]) for item in chunk_timing]
+        else:
+            start = duration * cursor_weight / total_weight
+            cursor_weight += sum(chunk_weights)
+            end = duration * cursor_weight / total_weight
+            word_durations = [max(0.04, (end - start) * w / max(0.01, sum(chunk_weights))) for w in chunk_weights]
         lines, line, line_chars = [], [], 0
         for word in chunk:
             if line and line_chars + len(word) + 1 > 19:
@@ -287,14 +323,12 @@ def make_ass_captions(script, duration, output_ass):
         if line:
             lines.append(line)
         lines = lines[:2]
-        # Add karaoke timing to each spoken word, preserving its punctuation.
         karaoke, wi = [], 0
         for li, line_words in enumerate(lines):
             if li:
                 karaoke.append(r"\N")
             for word in line_words:
-                weight = chunk_weights[wi]
-                word_cs = max(1, int(round((end - start) * 100 * weight / max(0.01, sum(chunk_weights)))))
+                word_cs = max(1, int(round(word_durations[wi] * 100)))
                 karaoke.append(r"{\kf" + str(word_cs) + "}" + ass_escape(word))
                 karaoke.append(" ")
                 wi += 1
@@ -323,7 +357,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     output_ass.write_text(header + "\n".join(events) + "\n", encoding="utf-8")
     return output_ass
 
-
 def make_video(clips,audio,script):
     normalized=[]
     for i,clip in enumerate(clips):
@@ -336,7 +369,7 @@ def make_video(clips,audio,script):
     audio_len=float(run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(audio)]).stdout.strip())
     duration=min(SECONDS,max(1.0,audio_len))
     output=OUT/"fitness_shorts.mp4"
-    ass=make_ass_captions(script,duration,OUT/"subtitles.ass")
+    ass=make_ass_captions(script,duration,OUT/"subtitles.ass",audio_path=audio)
     filt=str(ass.resolve()).replace("\\","/").replace(":","\\:").replace("'","\\'").replace(",","\\,")
     run(["ffmpeg","-y","-v","error","-i",str(montage),"-i",str(audio),"-vf",f"subtitles='{filt}'","-t",str(duration),"-map","0:v:0","-map","1:a:0","-shortest","-c:v","libx264","-preset","veryfast","-crf","22","-pix_fmt","yuv420p","-c:a","aac","-b:a","160k","-movflags","+faststart",str(output)])
     return output
