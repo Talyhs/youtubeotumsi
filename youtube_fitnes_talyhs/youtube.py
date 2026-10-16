@@ -230,6 +230,100 @@ def timestamp(sec):
     ms=int(max(0,sec)*1000); h,ms=divmod(ms,3600000); m,ms=divmod(ms,60000); s,ms=divmod(ms,1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
+
+def ass_timestamp(sec):
+    cs = int(max(0, sec) * 100)
+    h, cs = divmod(cs, 360000)
+    m, cs = divmod(cs, 6000)
+    s, cs = divmod(cs, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def ass_escape(text):
+    return str(text).replace("\\", r"\\").replace("{", r"\{").replace("}", r"\}")
+
+
+def caption_chunks(words, max_words=5, max_chars=34):
+    """Make quick-reading caption beats, normally 3–5 words each."""
+    chunks, current = [], []
+    chars = 0
+    for word in words:
+        extra = len(word) + (1 if current else 0)
+        if current and (len(current) >= max_words or chars + extra > max_chars):
+            chunks.append(current)
+            current, chars = [], 0
+        current.append(word)
+        chars += len(word) + (1 if len(current) > 1 else 0)
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def make_ass_captions(script, duration, output_ass):
+    """Create large, high-contrast karaoke captions with a moving word highlight."""
+    words = script.split()
+    if not words:
+        raise RuntimeError("Cannot create captions for an empty script")
+    chunks = caption_chunks(words)
+    # Weight timing by word length so longer words stay highlighted slightly longer.
+    weights = [max(2.0, min(10.0, len(re.sub(r"[^A-Za-z0-9]", "", w)) * 0.72)) for w in words]
+    total_weight = sum(weights) or 1.0
+    cursor_weight = 0.0
+    cursor_word = 0
+    events = []
+    for chunk in chunks:
+        chunk_weights = weights[cursor_word:cursor_word + len(chunk)]
+        start = duration * cursor_weight / total_weight
+        cursor_weight += sum(chunk_weights)
+        end = duration * cursor_weight / total_weight
+        # Split longer phrases into two balanced lines for phone screens.
+        lines, line, line_chars = [], [], 0
+        for word in chunk:
+            if line and line_chars + len(word) + 1 > 19:
+                lines.append(line)
+                line, line_chars = [], 0
+            line.append(word)
+            line_chars += len(word) + (1 if len(line) > 1 else 0)
+        if line:
+            lines.append(line)
+        lines = lines[:2]
+        # Add karaoke timing to each spoken word, preserving its punctuation.
+        karaoke, wi = [], 0
+        for li, line_words in enumerate(lines):
+            if li:
+                karaoke.append(r"\N")
+            for word in line_words:
+                weight = chunk_weights[wi]
+                word_cs = max(1, int(round((end - start) * 100 * weight / max(0.01, sum(chunk_weights)))))
+                karaoke.append(r"{\kf" + str(word_cs) + "}" + ass_escape(word))
+                karaoke.append(" ")
+                wi += 1
+        text_line = "".join(karaoke).strip()
+        events.append(
+            f"Dialogue: 0,{ass_timestamp(start)},{ass_timestamp(max(start + 0.12, end))},Karaoke,,0,0,0,,{text_line}"
+        )
+        cursor_word += len(chunk)
+
+    header = r"""[Script Info]
+Title: English Fitness Shorts Captions
+ScriptType: v4.00+
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+PlayResX: 1080
+PlayResY: 1920
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Karaoke,Arial,62,&H00FFFFFF,&H0000D7FF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,70,70,190,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    output_ass.write_text(header + "\n".join(events) + "\n", encoding="utf-8")
+    return output_ass
+
+
 def make_video(clips,audio,script):
     normalized=[]
     for i,clip in enumerate(clips):
@@ -239,14 +333,12 @@ def make_video(clips,audio,script):
     concat=TMP/"concat.txt"; concat.write_text("".join(f"file '{p.as_posix()}'\n" for p in normalized),encoding="utf-8")
     montage=TMP/"montage.mp4"
     run(["ffmpeg","-y","-v","error","-f","concat","-safe","0","-i",str(concat),"-t",str(SECONDS),"-an","-c:v","libx264","-preset","veryfast","-crf","23","-pix_fmt","yuv420p",str(montage)])
-    words=script.split(); size=max(4,min(8,len(words)//max(1,SECONDS//3))); chunks=[" ".join(words[i:i+size]) for i in range(0,len(words),size)]
-    srt=TMP/"subtitles.srt"; each=SECONDS/max(1,len(chunks)); lines=[]
-    for i,chunk in enumerate(chunks): lines += [str(i+1),f"{timestamp(i*each)} --> {timestamp(min(SECONDS,(i+1)*each))}",chunk,""]
-    srt.write_text("\n".join(lines),encoding="utf-8")
-    filt=str(srt.resolve()).replace("\\","/").replace(":",r"\:").replace("'",r"\'").replace(",",r"\,")
     audio_len=float(run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(audio)]).stdout.strip())
-    duration=min(SECONDS,max(30,int(audio_len+1))); output=OUT/"fitness_shorts.mp4"
-    run(["ffmpeg","-y","-v","error","-i",str(montage),"-i",str(audio),"-vf",f"subtitles='{filt}':force_style='FontName=Arial,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=150'","-t",str(duration),"-map","0:v:0","-map","1:a:0","-shortest","-c:v","libx264","-preset","veryfast","-crf","22","-pix_fmt","yuv420p","-c:a","aac","-b:a","160k","-movflags","+faststart",str(output)])
+    duration=min(SECONDS,max(1.0,audio_len))
+    output=OUT/"fitness_shorts.mp4"
+    ass=make_ass_captions(script,duration,OUT/"subtitles.ass")
+    filt=str(ass.resolve()).replace("\\","/").replace(":","\\:").replace("'","\\'").replace(",","\\,")
+    run(["ffmpeg","-y","-v","error","-i",str(montage),"-i",str(audio),"-vf",f"subtitles='{filt}'","-t",str(duration),"-map","0:v:0","-map","1:a:0","-shortest","-c:v","libx264","-preset","veryfast","-crf","22","-pix_fmt","yuv420p","-c:a","aac","-b:a","160k","-movflags","+faststart",str(output)])
     return output
 
 def youtube_service():
