@@ -25,7 +25,7 @@ on:
         description: "Video müddəti — 600 saniyə = 10 dəqiqə"
         required: true
         type: choice
-        options: ["30", "50", "55", "60", "180", "300", "600", "601"]
+        options: ["30", "45", "50", "55", "60", "180", "300", "600", "601"]
         default: "600"
       video_format:
         description: "Üfüqi = adi YouTube video; şaquli = Shorts"
@@ -103,10 +103,10 @@ jobs:
       ADD_SUBTITLES: ${{ github.event_name == 'workflow_dispatch' && inputs.subtitles || 'true' }}
       CREATE_THUMBNAIL: ${{ github.event_name == 'workflow_dispatch' && inputs.thumbnail || 'true' }}
       ENABLE_SEO: ${{ github.event_name == 'workflow_dispatch' && inputs.seo || 'true' }}
-      YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy || 'public' }}
+      YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy || 'private' }}
       AUTOMATION_END_DATE: '2027-10-14'
       TIMEZONE: Europe/Istanbul
-      PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'upload' }}
+      PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'prepare' }}
 
     steps:
       - name: Checkout repository
