@@ -9,7 +9,8 @@ This folder creates English-language fitness Shorts for the separate second YouT
 - Runtime-aware narration targets: approximately 52–72 words (30s), 82–105 words (45s), or 112–135 words (60s); rejected scripts use a duration-matched fallback
 - Pexels and Pixabay stock footage search and downloads
 - Microsoft Edge neural text-to-speech using `en-US-AriaNeural` (natural US English female voice)
-- FFmpeg montage and burned-in subtitles
+- FFmpeg montage and burned-in English karaoke captions: large bold text, dark outline/shadow, short readable phrase beats, and moving yellow word highlighting synchronized across the narration
+- A separate `output/subtitles.ass` caption file is saved with the generated video for review and future style tweaks
 - English title, description, hashtags, and stock-footage credits
 - Verifies the OAuth account can access the configured target channel before upload
 - Scheduled runs prepare videos only; public upload remains blocked by default
