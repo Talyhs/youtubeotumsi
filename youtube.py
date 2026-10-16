@@ -424,9 +424,9 @@ def generate_metadata(script):
         description = (
             f"{topic} hakkında kısa, anlaşılır ve merak uyandıran bilgiler. "
             "Videoda konunun en ilginç yönlerini keşfedin ve sonundaki ayrıntıyı kaçırmayın. "
-            "Sizce en şaşırtıcı bölüm hangisi? Yorumlara yazın.\\n\\n"
-            f"Araz Şahverdizadə kanalında bilim, tarih, teknoloji, doğa ve günlük yaşamdan yeni Türkçe Shorts videoları için abone olun.\\n\\n"
-            f"VİDEO METNİ:\\n{script.strip()}\\n\\n#Shorts #İlginçBilgiler #ŞaşırtıcıGerçekler #Bilim #Keşfet"
+            "Sizce en şaşırtıcı bölüm hangisi? Yorumlara yazın.\n\n"
+            f"Araz Şahverdizadə kanalında bilim, tarih, teknoloji, doğa ve günlük yaşamdan yeni Türkçe Shorts videoları için abone olun.\n\n"
+            f"VİDEO METNİ:\n{script.strip()}\n\n#Shorts #İlginçBilgiler #ŞaşırtıcıGerçekler #Bilim #Keşfet"
         )
         tags = (topic_words + ["ilginç bilgiler", "şaşırtıcı gerçekler", "bilimsel gerçekler", "kısa bilgi", "eğitim", "keşfet"])[:15]
     else:
