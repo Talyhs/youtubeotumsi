@@ -77,3 +77,9 @@ def test_fallback_script_is_turkish():
     text = youtube.fallback_script("şınav tekniği")
     assert "Bugün" in text
     assert "kontrollü" in text
+
+
+def test_turkish_topic_maps_to_specific_english_stock_searches():
+    terms = youtube.fallback_footage_terms("Şınavda yapılan 3 hata", "Şınavda Yapılan 3 Hata")
+    assert "push-up" in terms[0]
+    assert all(terms)
