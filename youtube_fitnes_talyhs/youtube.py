@@ -21,6 +21,7 @@ CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
 MODE = os.getenv("PUBLISH_MODE", "prepare").lower()
 SECONDS = max(30, min(60, int(os.getenv("VIDEO_SECONDS", "45"))))
 VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural")
+REQUESTED_TOPIC = os.getenv("FITNESS_TOPIC", "").strip()
 MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 ALLOW_PUBLIC = os.getenv("ALLOW_PUBLIC_UPLOAD", "NO").upper() == "YES"
 
@@ -53,6 +54,9 @@ def gen_json(prompt: str):
 
 def topic_data():
     title, topic = IDEAS[int(time.time() // 14400) % len(IDEAS)]
+    if REQUESTED_TOPIC:
+        title = REQUESTED_TOPIC[:90]
+        topic = REQUESTED_TOPIC[:180]
     data = gen_json(
         "Write an original English YouTube Fitness Shorts script. Return valid JSON with keys "
         "title, topic, script, search_terms (array), description, hashtags (array). "
@@ -66,7 +70,7 @@ def topic_data():
         return data
     return {
         "title": title, "topic": topic,
-        "script": "You do not need a perfect plan to get started. Begin with a small, safe step today. Warm up with a few easy movements before training. During a squat, keep your feet about shoulder-width apart, move with control, and breathe naturally. If a push-up feels too difficult, try wall push-ups first. Stop if you feel sharp pain and choose exercises that match your current ability. Consistency matters more than trying to do everything in one day. Save this video and take one positive step for your fitness today!",
+        "script": f"Today's fitness focus is {topic}. Start with a comfortable pace and choose movements that match your current ability. Warm up with a few easy movements before training, keep your technique controlled, and breathe naturally. If an exercise feels too difficult, choose an easier variation rather than forcing it. Stop if you feel sharp pain. Consistency matters more than trying to do everything in one day. Save this video and take one positive step for your fitness today!",
         "search_terms": ["fitness workout gym exercise", "person exercising at home"],
         "description": "Beginner-friendly fitness tips. Adapt exercises to your ability and stop if you feel pain.",
         "hashtags": ["#fitness", "#shorts", "#workout", "#exercise"]
