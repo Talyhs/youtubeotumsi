@@ -11,6 +11,29 @@ on:
         options:
           - prepare
           - upload
+      topic:
+        description: "Optional fitness Short topic"
+        type: string
+        required: false
+        default: ""
+      duration:
+        description: "Video duration in seconds"
+        type: choice
+        required: true
+        default: "45"
+        options:
+          - "30"
+          - "45"
+          - "60"
+      voice:
+        description: "English neural voice"
+        type: choice
+        required: true
+        default: female
+        options:
+          - female
+          - male
+          - auto
   schedule:
     # Turkey time (UTC+3): 07:30, 12:00, 18:30. Scheduled runs only prepare videos.
     - cron: "30 4 * * *"
@@ -30,8 +53,9 @@ jobs:
     timeout-minutes: 35
     env:
       PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'prepare' }}
-      VIDEO_SECONDS: "45"
-      EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE || 'en-US-AriaNeural' }}
+      FITNESS_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
+      VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '45' }}
+      EDGE_TTS_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'en-US-GuyNeural' || github.event_name == 'workflow_dispatch' && inputs.voice == 'female' && 'en-US-AriaNeural' || vars.EDGE_TTS_VOICE || 'en-US-AriaNeural' }}
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
