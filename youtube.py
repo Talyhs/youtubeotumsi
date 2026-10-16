@@ -555,14 +555,25 @@ def collect_clips(queries, wanted=5):
                     key = (item.get("source"), item.get("id") or item.get("url"))
                     if key not in seen:
                         seen.add(key)
+                        item["_search_query"] = query
                         candidates.append(item)
-                if len(candidates) >= wanted * 3:
-                    break
             except Exception as exc:
                 print(f"Provider {search.__name__} failed for {query!r}: {exc}. Continuing.")
-        if len(candidates) >= wanted * 3:
-            break
 
+    # Interleave results from different topic-specific searches so the first
+    # five clips are not all near-duplicates of the first query.
+    grouped = {}
+    for item in candidates:
+        grouped.setdefault(item.get("_search_query", ""), []).append(item)
+    diversified = []
+    query_order = list(grouped)
+    while any(grouped.values()):
+        for query in query_order:
+            if grouped[query]:
+                diversified.append(grouped[query].pop(0))
+    candidates = diversified
+
+    print(f"Collected {len(candidates)} unique candidates across {len(query_order)} searches.")
     selected = []
     for item in candidates:
         path = WORK / f"stock_{len(selected) + 1}.mp4"
