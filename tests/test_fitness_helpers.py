@@ -58,3 +58,22 @@ def test_upload_requires_explicit_confirmation(monkeypatch):
     monkeypatch.setattr(youtube, "ALLOW_PUBLIC", True)
     with pytest.raises(RuntimeError, match="explicit CONFIRM_UPLOAD"):
         youtube.upload("unused.mp4", {"title": "Test"}, [])
+
+
+
+def test_fitness_topics_are_turkish():
+    assert any("Şınav" in title for title, _ in youtube.IDEAS)
+    assert any("Squat" in title for title, _ in youtube.IDEAS)
+    assert youtube.VOICE == "tr-TR-EmelNeural"
+
+
+def test_montage_allocates_runtime_across_clips():
+    assert youtube.clip_segment_seconds(5, 45) == 9
+    assert youtube.clip_segment_seconds(3, 45) == 15
+    assert youtube.clip_segment_seconds(0, 45) == 45
+
+
+def test_fallback_script_is_turkish():
+    text = youtube.fallback_script("şınav tekniği")
+    assert "Bugün" in text
+    assert "kontrollü" in text
