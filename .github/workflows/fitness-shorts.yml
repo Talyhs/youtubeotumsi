@@ -38,6 +38,14 @@ on:
           - female
           - male
           - auto
+      whisper:
+        description: "Use Whisper for word-level subtitle timing (slower first run)"
+        type: choice
+        required: true
+        default: "no"
+        options:
+          - "no"
+          - "yes"
   schedule:
     # Turkey time (UTC+3): 07:30, 12:00, 18:30. Scheduled runs only prepare videos.
     - cron: "30 4 * * *"
@@ -60,8 +68,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install -r youtube_fitnes_talyhs/requirements.txt -r youtube_fitnes_talyhs/requirements-dev.txt
       - name: Check Python syntax
         run: python -m py_compile youtube_fitnes_talyhs/youtube.py
+      - name: Lint critical Python errors
+        run: ruff check --select E9,F63,F7,F82 youtube_fitnes_talyhs tests
+      - name: Run unit tests
+        run: pytest -q
 
   build:
     if: github.event_name != 'pull_request'
@@ -79,6 +93,7 @@ jobs:
       TOKEN_JSON: ${{ secrets.FITNESS_TOKEN_JSON }}
       YOUTUBE_CHANNEL_ID: ${{ vars.FITNESS_YOUTUBE_CHANNEL_ID }}
       ALLOW_PUBLIC_UPLOAD: ${{ vars.FITNESS_ALLOW_PUBLIC_UPLOAD || 'NO' }}
+      USE_WHISPER_CAPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.whisper == 'yes' && 'YES' || vars.USE_WHISPER_CAPTIONS || 'NO' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +107,10 @@ jobs:
       - name: Install Python dependencies
         working-directory: youtube_fitnes_talyhs
         run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Install optional Whisper alignment engine
+        if: env.USE_WHISPER_CAPTIONS == 'YES'
+        working-directory: youtube_fitnes_talyhs
+        run: pip install -r requirements-whisper.txt
       - name: Validate configuration
         shell: bash
         run: |
