@@ -11,6 +11,8 @@ This folder creates English-language fitness Shorts for the separate second YouT
 - Microsoft Edge neural text-to-speech using `en-US-AriaNeural` (natural US English female voice)
 - FFmpeg montage and burned-in English karaoke captions: large bold text, dark outline/shadow, short readable phrase beats, and moving yellow word highlighting synchronized across the narration
 - A separate `output/subtitles.ass` caption file is saved with the generated video for review and future style tweaks
+- Optional open-source OpenAI Whisper word-level timestamps for tighter caption synchronization; estimated timing remains the fallback
+- Automated helper tests, critical-error lint checks, and weekly Dependabot update PRs
 - English title, description, hashtags, and stock-footage credits
 - Verifies the OAuth account can access the configured target channel before upload
 - Scheduled runs prepare videos only; public upload remains blocked by default
@@ -46,6 +48,16 @@ Open **Settings → Secrets and variables → Actions → Variables** and add:
 - `FITNESS_ALLOW_PUBLIC_UPLOAD` = `NO` until testing is complete
 - `EDGE_TTS_VOICE` = `en-US-AriaNeural`
 - `GEMINI_MODEL` = `gemini-2.5-flash`
+
+## Optional Whisper subtitle synchronization
+
+By default, the workflow uses lightweight estimated caption timing. To enable Whisper word-level timing for a manual run, choose **whisper = yes** in the workflow inputs. This installs the open-source `openai-whisper` package and its PyTorch dependency, so the first run takes longer and may use more memory. Whisper model weights are downloaded on first use. If Whisper cannot run or returns no timestamps, the generator logs a warning and falls back to estimated timing. For scheduled runs, set the Actions Variable `USE_WHISPER_CAPTIONS` to `YES` only if you want the slower mode on every scheduled run; leave it unset or `NO` for the default.
+
+## Automated checks
+
+Pull requests touching the fitness bot run Python syntax validation, Ruff checks for critical errors, and unit tests. Dependabot checks GitHub Actions and Python dependencies weekly and proposes updates as pull requests. These checks improve maintainability but do not replace listening to the generated narration and visually reviewing a finished MP4.
+
+For local checks, install development tools with `python -m pip install -r youtube_fitnes_talyhs/requirements-dev.txt`, then run `ruff check --select E9,F63,F7,F82 youtube_fitnes_talyhs tests` and `pytest -q` from the repository root.
 
 ## First test
 1. Add the API keys and Variables.
