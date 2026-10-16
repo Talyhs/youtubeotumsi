@@ -96,6 +96,21 @@ def fallback_script(topic):
     return " ".join(chosen)
 
 
+def is_english_text(text):
+    """Reject common Turkish/Azerbaijani output so the channel remains English-only."""
+    value = str(text or "").casefold()
+    if re.search(r"[çğıöşüəı]", value):
+        return False
+    non_english_markers = {
+        "bugün", "şınav", "antrenman", "egzersiz", "hareketleri", "başla",
+        "dikkat", "doğru", "yanlış", "vücuduna", "kendini", "ağrı",
+        "nasıl", "neden", "önemli", "için", "veya", "değil", "gerekir",
+        "başlangıç", "sırasında", "çalışma", "kaslarını", "tekrarlarını",
+    }
+    words = set(re.findall(r"[a-zçğıöşüəı]+", value))
+    return not (words & non_english_markers)
+
+
 def topic_data():
     title, topic = IDEAS[int(time.time() // 14400) % len(IDEAS)]
     if REQUESTED_TOPIC:
@@ -129,6 +144,9 @@ def topic_data():
             and all(k in item for k in ("title", "script", "search_terms"))
             and isinstance(item.get("title"), str) and bool(item["title"].strip())
             and isinstance(item.get("script"), str) and bool(item["script"].strip())
+            and is_english_text(item.get("title", ""))
+            and is_english_text(item.get("script", ""))
+            and is_english_text(item.get("description", ""))
         )
 
     if valid_payload(data):
