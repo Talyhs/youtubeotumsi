@@ -108,18 +108,18 @@ def topic_data():
         "Türkçe içerik üreten deneyimli bir fitness yazarı ve titiz editör gibi davran. "
         "Bir YouTube Fitness Shorts videosu için özgün içerik oluştur ve yalnızca şu anahtarlarla geçerli JSON döndür: "
         "title, topic, script, search_terms (array of 3-5 strings), description, hashtags (array). "
-        f"Subject: {topic}. Runtime: {SECONDS} seconds. The spoken script MUST contain {min_words}-{max_words} words "
-        f"(aim for about {target_words}); this limit is important because the voice-over must fit the video. "
+        f"Konu: {topic}. Süre: {SECONDS} saniye. Konuşma metni mutlaka {min_words}-{max_words} kelime olsun "
+        f"(hedef yaklaşık {target_words} kelime); seslendirme video süresine sığmalıdır. "
         "Metni doğal, akıcı ve doğru Türkiye Türkçesiyle yaz; dil bilgisi, yazım ve noktalama kurallarına uy. "
         "Metni sesli okunuyormuş gibi kontrol et; yapay, tekrarlı veya çeviri gibi duran cümleleri düzelt. "
-        "Use contractions where natural, varied sentence openings, short speakable sentences, and a compelling hook in the first line. "
-        "Structure: hook, one clear practical tip, a brief actionable explanation, sensible safety note when relevant, and a natural CTA. "
+        "Farklı cümle başlangıçları, kısa ve seslendirmeye uygun ifadeler kullan; ilk cümlede dikkat çekici bir giriş yap. "
+        "Yapı: dikkat çekici giriş, tek ve net bir pratik öneri, uygulanabilir kısa açıklama, gerektiğinde güvenlik uyarısı ve doğal takip çağrısı. "
         "Konuşma metninde yalnızca anlatıcının söyleyeceği sözler bulunsun; başlık, sahne yönergesi, emoji veya madde işareti ekleme. "
-        "Make every tip specific to the subject; never invent statistics, promise results, shame bodies, or give medical advice. "
-        "Keep claims realistic and beginner-friendly. The title must be concise, accurate, and clickable without clickbait. "
+        "Her öneri konuya özel olsun; istatistik uydurma, sonuç garantisi verme, bedenleri aşağılamama ve tıbbi tavsiye sunma. "
+        "İddialar gerçekçi ve başlangıç seviyesine uygun olsun. Başlık kısa, doğru ve yanıltıcı olmayan şekilde ilgi çekici olsun. "
         "Açıklama doğal Türkçe olsun ve videoda anlatılanları doğru biçimde özetlesin. "
         "search_terms alanındaki arama ifadelerini Pexels ve Pixabay'de daha iyi sonuç için İngilizce yaz; tam konuya uygun gerçek görüntüler tarif et, alakasız genel spor salonu klipleri kullanma. "
-        "Return clean JSON only; do not include markdown fences or commentary."
+        "Yalnızca geçerli JSON döndür; Markdown kod çiti veya ek açıklama ekleme."
     )
     data = gen_json(prompt)
 
@@ -138,7 +138,7 @@ def topic_data():
             revised = gen_json(
                 "Bu fitness Shorts metnini akıcı ve doğal Türkiye Türkçesiyle yeniden yaz. "
                 f"The final spoken script must contain {min_words}-{max_words} words, with no headings or stage directions. "
-                "Preserve accurate, safe advice and the same topic. Return the same JSON keys only. "
+                "Güvenli ve doğru önerileri ve aynı konuyu koru. Yalnızca aynı JSON anahtarlarını döndür. "
                 f"JSON to revise: {json.dumps(data, ensure_ascii=False)}"
             )
             if valid_payload(revised) and min_words <= script_word_count(revised["script"]) <= max_words:
@@ -150,7 +150,7 @@ def topic_data():
         data["title"] = data["title"].strip()[:90]
         data["topic"] = str(data.get("topic") or topic).strip()[:180]
         data["script"] = data["script"].strip()
-        data["description"] = str(data.get("description") or "Beginner-friendly fitness tips.").strip()
+        data["description"] = str(data.get("description") or "Başlangıç seviyesine uygun fitness önerileri.").strip()
         if not isinstance(data.get("search_terms"), list):
             data["search_terms"] = [str(data["search_terms"])]
         data["search_terms"] = [str(x).strip() for x in data["search_terms"] if str(x).strip()][:5]
@@ -420,11 +420,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     output_ass.write_text(header + "\n".join(events) + "\n", encoding="utf-8")
     return output_ass
 
+def clip_segment_seconds(clip_count, total_seconds=SECONDS):
+    """Split the Short runtime across all downloaded clips instead of showing only clip one."""
+    return max(2, (total_seconds + max(1, clip_count) - 1) // max(1, clip_count))
+
+
 def make_video(clips,audio,script):
     normalized=[]
+    segment_seconds = clip_segment_seconds(len(clips))
     for i,clip in enumerate(clips):
         dst=TMP/f"norm_{i}.mp4"
-        run(["ffmpeg","-y","-v","error","-i",str(clip),"-t",str(SECONDS),"-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30","-an","-c:v","libx264","-preset","veryfast","-crf","23","-pix_fmt","yuv420p",str(dst)])
+        # Loop very short stock footage if needed, then trim each clip to its montage segment.
+        run(["ffmpeg","-y","-v","error","-stream_loop","-1","-i",str(clip),"-t",str(segment_seconds),"-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30","-an","-c:v","libx264","-preset","veryfast","-crf","23","-pix_fmt","yuv420p",str(dst)])
         normalized.append(dst)
     concat=TMP/"concat.txt"; concat.write_text("".join(f"file '{p.as_posix()}'\n" for p in normalized),encoding="utf-8")
     montage=TMP/"montage.mp4"
@@ -456,7 +463,7 @@ def upload(path,data,credits,thumbnail_path=None):
     for ch in channels: print(f"OAuth channel: {ch['snippet']['title']} | {ch['id']}")
     target=next((c for c in channels if c["id"]==CHANNEL_ID),None)
     if not target: raise RuntimeError("Target channel ID was not visible to this OAuth account; upload blocked")
-    tags=parse_list(data.get("hashtags",["#fitness","#shorts","#workout"]))
+    tags=parse_list(data.get("hashtags",["#fitness","#shorts","#antrenman"]))
     desc=(str(data.get("description","Fitness önerileri"))+"\n\nBu içerik genel bilgilendirme amaçlıdır. Hareketleri kendi seviyene göre uyarla ve ağrı hissedersen dur.\n\nStock footage credits:\n"+"\n".join(credits)+"\n\n"+" ".join(tags)+" #Shorts")[:5000]
     body={"snippet":{"title":(str(data["title"])[:90]+" #Shorts")[:100],"description":desc,"tags":[t.lstrip("#") for t in tags]+["Shorts","fitness","workout"],"categoryId":"26"},"status":{"privacyStatus":"public","selfDeclaredMadeForKids":False}}
     req=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(path),mimetype="video/mp4",resumable=True)); response=None
