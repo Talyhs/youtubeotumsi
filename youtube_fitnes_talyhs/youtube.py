@@ -53,7 +53,7 @@ def gen_json(prompt: str):
         return None
 
 def topic_data():
-    title, topic = IDEAS[int(time.time() // 86400) % len(IDEAS)]
+    title, topic = IDEAS[int(time.time() // 14400) % len(IDEAS)]
     data = gen_json(
         "Türkçe, özgün bir YouTube Fitness Shorts metni yaz. Geçerli JSON döndür; anahtarlar: "
         "title, topic, script, search_terms (array), description, hashtags (array). "
@@ -62,8 +62,8 @@ def topic_data():
         "garantili sonuç veya tehlikeli tavsiye yok. Metin yaklaşık 80-115 Türkçe kelime olsun."
     )
     if data and all(k in data for k in ("title", "script", "search_terms")):
-        data.setdefault("topic", topic); data.setdefault("description", "General fitness tips for everyday movement.")
-        data.setdefault("hashtags", ["#fitness", "#shorts", "#workout"])
+        data.setdefault("topic", topic); data.setdefault("description", "Başlangıç seviyesine uygun genel fitness önerileri.")
+        data.setdefault("hashtags", ["#fitness", "#shorts", "#antrenman"])
         return data
     return {
         "title": title, "topic": topic,
