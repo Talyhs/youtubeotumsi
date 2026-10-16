@@ -137,7 +137,7 @@ def thumbnail(title,bg=None):
 gate();init_db()
 CHANNELS = {
     "Əsas YouTube kanalı": {"kind":"main", "workflow":WORKFLOW, "channel_id":os.getenv("YOUTUBE_CHANNEL_ID","").strip()},
-    "Fitness Shorts · English": {"kind":"fitness", "workflow":".github/workflows/fitness-shorts.yml", "channel_id":os.getenv("FITNESS_YOUTUBE_CHANNEL_ID","UC7_pFbnnuMWT_US47_FD6MDA").strip()},
+    "Fitness Shorts · English": {"kind":"fitness", "workflow":"fitness-shorts.yml", "channel_id":os.getenv("FITNESS_YOUTUBE_CHANNEL_ID","UC7_pFbnnuMWT_US47_FD6MDA").strip()},
 }
 st.sidebar.markdown("## 🎬 TALYHS STUDIO")
 st.sidebar.caption("Creator command center")
