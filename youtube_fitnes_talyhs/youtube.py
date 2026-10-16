@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""English-language fitness YouTube Shorts automation."""
+"""Turkish-language fitness YouTube Shorts automation."""
 from __future__ import annotations
 import asyncio, json, os, random, re, shutil, subprocess, sys, time
 from pathlib import Path
@@ -24,20 +24,20 @@ TOKEN_JSON = os.getenv("TOKEN_JSON", "")
 CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
 MODE = os.getenv("PUBLISH_MODE", "prepare").lower()
 SECONDS = max(30, min(60, int(os.getenv("VIDEO_SECONDS", "45"))))
-VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural")
+VOICE = os.getenv("EDGE_TTS_VOICE", "tr-TR-EmelNeural")
 REQUESTED_TOPIC = os.getenv("FITNESS_TOPIC", "").strip()
 MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 ALLOW_PUBLIC = os.getenv("ALLOW_PUBLIC_UPLOAD", "NO").upper() == "YES"
 CONFIRM_UPLOAD = os.getenv("CONFIRM_UPLOAD", "NO").upper() == "YES"
 
 IDEAS = [
-    ("3 Push-Up Mistakes to Avoid", "proper push-up form for beginners"),
-    ("A Simple Warm-Up Before Every Workout", "safe beginner warm-up exercises"),
-    ("How to Do Squats With Better Form", "bodyweight squat technique and safety"),
-    ("Why Rest Days Help You Improve", "fitness recovery and rest days"),
-    ("Build a Workout Habit That Lasts", "how to build a consistent exercise habit"),
-    ("Stay Hydrated During Your Workout", "hydration reminders during exercise"),
-    ("A Simple Home Workout Without Equipment", "beginner bodyweight exercises at home"),
+    ("Şınavda Yapılan 3 Hata", "beginner push-up form demonstration"),
+    ("Antrenman Öncesi Basit Isınma", "safe beginner warm-up exercises"),
+    ("Squat Nasıl Doğru Yapılır?", "bodyweight squat technique demonstration"),
+    ("Dinlenme Günleri Neden Önemli?", "fitness recovery rest day"),
+    ("Düzenli Egzersiz Alışkanlığı Nasıl Kazanılır?", "beginner home workout routine"),
+    ("Antrenmanda Su İçmek Neden Önemli?", "athlete drinking water during workout"),
+    ("Ekipmansız Evde Antrenman", "beginner bodyweight exercises at home"),
 ]
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
     p = subprocess.run(cmd, text=True, capture_output=True)
@@ -74,18 +74,18 @@ def target_word_range(seconds):
 def fallback_script(topic):
     """Readable, safety-conscious fallback with length matched to the selected duration."""
     sentences = [
-        f"Today, we're focusing on {topic}.",
-        "Start at a comfortable pace and choose movements you can control.",
-        "Keep your posture steady, move smoothly, and breathe throughout each repetition.",
-        "Before you begin, warm up with a few easy movements.",
-        "If your form starts to slip, slow down or take a short break.",
-        "You do not need maximum intensity to build a consistent exercise habit.",
-        "Choose movements that suit your current fitness level and available space.",
-        "Stop if you feel sharp pain, dizziness, or unusual discomfort.",
-        "Give your body time to recover, drink water, and get enough sleep.",
-        "Steady practice over time is more useful than one extremely hard workout.",
-        "Focus on controlled technique instead of rushing through each repetition.",
-        "Try this tip in your next session, and follow for more practical fitness advice.",
+        f"Bugün {topic} konusuna odaklanıyoruz.",
+        "Kendini rahat hissettiğin bir tempoda başla ve kontrol edebildiğin hareketleri seç.",
+        "Duruşunu koru, hareketleri kontrollü yap ve her tekrarda nefes alıp ver.",
+        "Başlamadan önce birkaç kolay hareketle ısın.",
+        "Hareket tekniğin bozulmaya başlarsa yavaşla veya kısa bir mola ver.",
+        "Düzenli egzersiz alışkanlığı kazanmak için kendini sonuna kadar zorlaman gerekmez.",
+        "Mevcut kondisyonuna ve çalışma alanına uygun hareketler seç.",
+        "Keskin ağrı, baş dönmesi veya alışılmadık bir rahatsızlık hissedersen dur.",
+        "Vücuduna toparlanması için zaman tanı, su iç ve yeterince uyu.",
+        "Zaman içinde düzenli çalışmak, tek seferde aşırı zorlanmaktan daha faydalıdır.",
+        "Her tekrarı aceleyle yapmak yerine doğru ve kontrollü tekniğe odaklan.",
+        "Bu öneriyi bir sonraki antrenmanında dene ve daha fazla fitness tavsiyesi için takip et.",
     ]
     target = round(SECONDS * 2.0)
     chosen = []
@@ -105,20 +105,20 @@ def topic_data():
     min_words, max_words = target_word_range(SECONDS)
     target_words = round((min_words + max_words) / 2)
     prompt = (
-        "Act as an experienced American English fitness scriptwriter and meticulous copy editor. "
-        "Create one original YouTube Fitness Short and return ONLY valid JSON with these keys: "
+        "Türkçe içerik üreten deneyimli bir fitness yazarı ve titiz editör gibi davran. "
+        "Bir YouTube Fitness Shorts videosu için özgün içerik oluştur ve yalnızca şu anahtarlarla geçerli JSON döndür: "
         "title, topic, script, search_terms (array of 3-5 strings), description, hashtags (array). "
         f"Subject: {topic}. Runtime: {SECONDS} seconds. The spoken script MUST contain {min_words}-{max_words} words "
         f"(aim for about {target_words}); this limit is important because the voice-over must fit the video. "
-        "Write fluent, natural, idiomatic US English with correct grammar, spelling, punctuation, and clear pronunciation. "
-        "Read the script aloud mentally and rewrite any stiff, translated-sounding, repetitive, or awkward sentence. "
+        "Metni doğal, akıcı ve doğru Türkiye Türkçesiyle yaz; dil bilgisi, yazım ve noktalama kurallarına uy. "
+        "Metni sesli okunuyormuş gibi kontrol et; yapay, tekrarlı veya çeviri gibi duran cümleleri düzelt. "
         "Use contractions where natural, varied sentence openings, short speakable sentences, and a compelling hook in the first line. "
         "Structure: hook, one clear practical tip, a brief actionable explanation, sensible safety note when relevant, and a natural CTA. "
-        "The script must contain ONLY words the narrator should speak: no headings, stage directions, emojis, or bullet points. "
+        "Konuşma metninde yalnızca anlatıcının söyleyeceği sözler bulunsun; başlık, sahne yönergesi, emoji veya madde işareti ekleme. "
         "Make every tip specific to the subject; never invent statistics, promise results, shame bodies, or give medical advice. "
         "Keep claims realistic and beginner-friendly. The title must be concise, accurate, and clickable without clickbait. "
-        "The description should be natural English and summarize the actual video. "
-        "Search terms must describe relevant real footage for this exact subject, not generic unrelated gym clips. "
+        "Açıklama doğal Türkçe olsun ve videoda anlatılanları doğru biçimde özetlesin. "
+        "search_terms alanındaki arama ifadelerini Pexels ve Pixabay'de daha iyi sonuç için İngilizce yaz; tam konuya uygun gerçek görüntüler tarif et, alakasız genel spor salonu klipleri kullanma. "
         "Return clean JSON only; do not include markdown fences or commentary."
     )
     data = gen_json(prompt)
@@ -136,7 +136,7 @@ def topic_data():
         if not min_words <= count <= max_words:
             print(f"INFO: Revising narration length ({count} words; target {min_words}-{max_words}).")
             revised = gen_json(
-                "Rewrite this fitness Short script in polished, natural American English. "
+                "Bu fitness Shorts metnini akıcı ve doğal Türkiye Türkçesiyle yeniden yaz. "
                 f"The final spoken script must contain {min_words}-{max_words} words, with no headings or stage directions. "
                 "Preserve accurate, safe advice and the same topic. Return the same JSON keys only. "
                 f"JSON to revise: {json.dumps(data, ensure_ascii=False)}"
@@ -157,20 +157,20 @@ def topic_data():
         if not data["search_terms"]:
             data["search_terms"] = [f"{topic} exercise demonstration"]
         if not isinstance(data.get("hashtags"), list):
-            data["hashtags"] = ["#fitness", "#shorts", "#workout"]
+            data["hashtags"] = ["#fitness", "#shorts", "#antrenman"]
         data["hashtags"] = [str(x).strip() for x in data["hashtags"] if str(x).strip()][:8]
         if not data["hashtags"]:
-            data["hashtags"] = ["#fitness", "#shorts", "#workout"]
-        print(f"English script quality gate: {script_word_count(data['script'])} words; target {min_words}-{max_words}.")
+            data["hashtags"] = ["#fitness", "#shorts", "#antrenman"]
+        print(f"Turkish script quality gate: {script_word_count(data['script'])} words; target {min_words}-{max_words}.")
         return data
 
-    print("WARNING: AI script was unavailable or failed the duration/quality checks; using the reviewed English fallback.")
+    print("UYARI: Yapay zekâ metni oluşturulamadı veya süre/kalite kontrolünü geçemedi; kontrol edilmiş Türkçe yedek metin kullanılacak.")
     return {
         "title": title, "topic": topic,
         "script": fallback_script(topic),
         "search_terms": [f"{topic} exercise demonstration", f"{topic} proper technique", "beginner fitness exercise form"],
-        "description": f"Practical, beginner-friendly advice about {topic}. Choose movements that suit your ability and stop if you feel pain.",
-        "hashtags": ["#fitness", "#shorts", "#workout", "#exercise"]
+        "description": f"{topic} hakkında başlangıç seviyesine uygun pratik öneriler. Kendine uygun hareketleri seç ve ağrı hissedersen dur.",
+        "hashtags": ["#fitness", "#shorts", "#antrenman", "#egzersiz"]
     }
 
 def parse_list(value):
@@ -359,7 +359,7 @@ def make_ass_captions(script, duration, output_ass, audio_path=None):
     if not words:
         raise RuntimeError("Cannot create captions for an empty script")
     chunks = caption_chunks(words)
-    weights = [max(2.0, min(10.0, len(re.sub(r"[^A-Za-z0-9]", "", w)) * 0.72)) for w in words]
+    weights = [max(2.0, min(10.0, len(re.sub(r"[^\w]", "", w, flags=re.UNICODE)) * 0.72)) for w in words]
     total_weight = sum(weights) or 1.0
     cursor_weight = 0.0
     cursor_word = 0
@@ -402,7 +402,7 @@ def make_ass_captions(script, duration, output_ass, audio_path=None):
         cursor_word += len(chunk)
 
     header = r"""[Script Info]
-Title: English Fitness Shorts Captions
+Title: Turkish Fitness Shorts Captions
 ScriptType: v4.00+
 WrapStyle: 2
 ScaledBorderAndShadow: yes
@@ -457,7 +457,7 @@ def upload(path,data,credits,thumbnail_path=None):
     target=next((c for c in channels if c["id"]==CHANNEL_ID),None)
     if not target: raise RuntimeError("Target channel ID was not visible to this OAuth account; upload blocked")
     tags=parse_list(data.get("hashtags",["#fitness","#shorts","#workout"]))
-    desc=(str(data.get("description","Fitness tips"))+"\n\nGeneral information only. Adapt exercises to your ability and stop if you feel pain.\n\nStock footage credits:\n"+"\n".join(credits)+"\n\n"+" ".join(tags)+" #Shorts")[:5000]
+    desc=(str(data.get("description","Fitness önerileri"))+"\n\nBu içerik genel bilgilendirme amaçlıdır. Hareketleri kendi seviyene göre uyarla ve ağrı hissedersen dur.\n\nStock footage credits:\n"+"\n".join(credits)+"\n\n"+" ".join(tags)+" #Shorts")[:5000]
     body={"snippet":{"title":(str(data["title"])[:90]+" #Shorts")[:100],"description":desc,"tags":[t.lstrip("#") for t in tags]+["Shorts","fitness","workout"],"categoryId":"26"},"status":{"privacyStatus":"public","selfDeclaredMadeForKids":False}}
     req=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(path),mimetype="video/mp4",resumable=True)); response=None
     while response is None:
