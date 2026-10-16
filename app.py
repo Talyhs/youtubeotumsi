@@ -182,7 +182,11 @@ elif page=="Video istehsalı":
             topic = custom_fitness_topic.strip() if selected_fitness_topic == "Custom topic…" else selected_fitness_topic
         else:
             topic=st.text_input("Mövzu",placeholder="Fironların gizli tarixi")
-        a,b,c=st.columns(3);lang=a.selectbox("Dil",list(LANG),0);dur=b.selectbox("Müddət",list(DUR),1);fmt=c.selectbox("Format",["Shorts · 9:16","Standart · 16:9"])
+        a,b,c=st.columns(3)
+        if ACTIVE_CHANNEL["kind"] == "fitness":
+            lang=a.selectbox("Dil",["English"],0);dur=b.selectbox("Müddət",["30 saniyə","45 saniyə","1 dəqiqə"],1);fmt=c.selectbox("Format",["Shorts · 9:16"])
+        else:
+            lang=a.selectbox("Dil",list(LANG),0);dur=b.selectbox("Müddət",list(DUR),1);fmt=c.selectbox("Format",["Shorts · 9:16","Standart · 16:9"])
         a,b=st.columns(2)
         voice_options = ["female","male","auto"] if ACTIVE_CHANNEL["kind"] == "fitness" else ["male","female","auto"]
         voice=a.selectbox("English neural voice" if ACTIVE_CHANNEL["kind"] == "fitness" else "Səs",voice_options,0)
