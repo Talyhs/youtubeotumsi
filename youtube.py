@@ -523,13 +523,20 @@ def collect_clips(queries, wanted=5):
     # Stock libraries usually return stronger results for English queries.
     # Keep fallback footage searches related to this video's actual topic.
     primary_query = str((queries or ["science documentary"])[0]).strip()
+    topic_is_pharaohs = any(
+        term in " ".join(str(q) for q in (queries or [])).lower()
+        for term in ("pharaoh", "ancient egypt", "egyptian temple", "giza", "tutankhamun", "hieroglyph")
+    )
     extra_queries = [
         f"{primary_query} cinematic",
         f"{primary_query} close up",
         f"{primary_query} documentary footage",
-        "educational documentary footage",
-        "cinematic science b-roll",
     ]
+    if not topic_is_pharaohs:
+        extra_queries.extend([
+            "educational documentary footage",
+            "cinematic science b-roll",
+        ])
     all_queries = []
     for query in list(queries or []) + extra_queries:
         query = re.sub(r"[^A-Za-z0-9 ,'-]", " ", str(query)).strip()
@@ -1392,7 +1399,20 @@ def main():
     if requested_topic:
         TOPIC = requested_topic
         topic_lower = requested_topic.lower()
-        if any(word in topic_lower for word in ("beyin", "brain", "neuron", "neyron")):
+        if any(word in topic_lower for word in ("firavun", "firon", "antik mısır", "antik misir", "pharaoh", "ancient egypt", "egypt")):
+            # Use English stock-search terms because stock libraries index footage better in English.
+            # Keep every query tied to Ancient Egypt rather than generic science b-roll.
+            stock_queries = [
+                "ancient Egypt pyramids Giza",
+                "Egyptian pharaoh statue",
+                "ancient Egyptian temple Karnak",
+                "Egyptian hieroglyphics stone wall",
+                "Great Sphinx of Giza",
+                "Tutankhamun golden mask museum",
+                "Nile river Egypt desert",
+                "ancient Egypt tomb interior",
+            ]
+        elif any(word in topic_lower for word in ("beyin", "brain", "neuron", "neyron")):
             stock_queries = [
                 "human brain neuroscience animation",
                 "brain neurons medical visualization",
