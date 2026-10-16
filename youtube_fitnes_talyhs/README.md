@@ -4,13 +4,18 @@ This folder creates English-language fitness Shorts for the separate second YouT
 
 ## Features
 - Vertical MP4 output at 1080×1920, default 45 seconds (configurable from 30–60 seconds)
-- Original English fitness scripts with a fallback script if Gemini is unavailable
+- Original English fitness scripts with a reviewed fallback if Gemini is unavailable
+- English quality gate: natural US English, grammar/spelling guidance, topic-specific SEO search terms, and a second AI rewrite when narration length is outside the selected runtime
+- Runtime-aware narration targets: approximately 52–72 words (30s), 82–105 words (45s), or 112–135 words (60s); rejected scripts use a duration-matched fallback
 - Pexels and Pixabay stock footage search and downloads
 - Microsoft Edge neural text-to-speech using `en-US-AriaNeural` (natural US English female voice)
 - FFmpeg montage and burned-in subtitles
 - English title, description, hashtags, and stock-footage credits
 - Verifies the OAuth account can access the configured target channel before upload
 - Scheduled runs prepare videos only; public upload remains blocked by default
+
+## English script quality
+The generator asks for idiomatic, grammatically correct American English and checks that narration length matches the selected 30/45/60-second runtime. If the generated script is outside the target word range, it requests one revision; if the result still fails validation or the AI service is unavailable, it uses a safety-conscious fallback matched to the selected duration. Always listen to the generated audio and review captions before publishing.
 
 ## Voice
 Default: `en-US-AriaNeural` — English (United States), neural female voice.
