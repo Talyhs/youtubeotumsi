@@ -168,7 +168,7 @@ if page=="İdarə paneli":
             if ACTIVE_CHANNEL["kind"] == "fitness":
                 dispatch({"mode":"prepare","topic":"Beginner home workout tips","duration":"45","voice":"female"},workflow=ACTIVE_WORKFLOW)
             else:
-                dispatch({"topic":"İnsan beyni haqqında maraqlı faktlar","language":"az","duration":"50","video_format":"vertical","voice":"female","stock_sources":"Pixabay,Pexels","subtitles":"true","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"})
+                dispatch({"topic":"İnsan beyni haqqında maraqlı faktlar","language":"az","duration":"50","video_format":"vertical","voice":"female","voice_provider":"edge","stock_sources":"Pixabay,Pexels","subtitles":"true","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"})
             st.success("Əmr göndərildi. Hazırlıq rejimi seçilib.")
         except Exception as e: st.error(str(e))
 
@@ -187,12 +187,21 @@ elif page=="Video istehsalı":
             lang=a.selectbox("Dil",["English"],0);dur=b.selectbox("Müddət",["30 saniyə","45 saniyə","1 dəqiqə"],1);fmt=c.selectbox("Format",["Shorts · 9:16"])
         else:
             lang=a.selectbox("Dil",list(LANG),0);dur=b.selectbox("Müddət",list(DUR),1);fmt=c.selectbox("Format",["Shorts · 9:16","Standart · 16:9"])
-        a,b=st.columns(2)
-        voice_options = ["female","male","auto"] if ACTIVE_CHANNEL["kind"] == "fitness" else ["male","female","auto"]
-        voice=a.selectbox("English neural voice" if ACTIVE_CHANNEL["kind"] == "fitness" else "Səs",voice_options,0)
-        stock=b.multiselect("Stok mənbələri",["Pixabay","Pexels"],["Pixabay","Pexels"])
-        if ACTIVE_CHANNEL["kind"] == "fitness": st.caption("Female: en-US-AriaNeural · Male: en-US-GuyNeural · Auto: konfiqurasiya edilmiş səs.")
-        else: st.caption("Əsas kanalın səs mühərriki mövcud workflow tərəfindən idarə edilir.")
+        if ACTIVE_CHANNEL["kind"] == "fitness":
+            a,b=st.columns(2)
+            voice_options = ["female","male","auto"]
+            voice=a.selectbox("English neural voice",voice_options,0)
+            voice_provider="edge"
+            stock=b.multiselect("Stok mənbələri",["Pixabay","Pexels"],["Pixabay","Pexels"])
+            st.caption("Female: en-US-AriaNeural · Male: en-US-GuyNeural · səs mühərriki: Edge TTS.")
+        else:
+            a,b,c=st.columns(3)
+            voice=a.selectbox("Səs",["male","female","auto"],0)
+            provider_options=["edge","ema","kokoro","elevenlabs","fliki","auto"]
+            provider_default={"az":"edge","tr":"ema","en":"kokoro"}.get(LANG[lang],"edge")
+            voice_provider=b.selectbox("AI səs mühərriki",provider_options,index=provider_options.index(provider_default))
+            stock=c.multiselect("Stok mənbələri",["Pixabay","Pexels"],["Pixabay","Pexels"])
+            st.caption("Tövsiyə: Azərbaycan dili — Edge; Türk dili — EMA; İngilis dili — Kokoro. API tələb edən xidmətlər üçün uyğun GitHub Secret lazımdır.")
         a,b,c=st.columns(3);subs=a.checkbox("Subtitrlər",True);thumb=b.checkbox("Thumbnail",True);seo=c.checkbox("SEO metadata",True)
         privacy=st.selectbox("Görünmə",["private","unlisted","public"],0);publish=st.radio("Əməl",["Yalnız hazırla","Hazırla və YouTube-a yüklə"],0);confirm=st.checkbox("İctimai yayımı təsdiqləyirəm. Fitness kanalının upload rejimi hazırda videonu PUBLIC yayımlayır.")
         ok=st.form_submit_button("🚀 İstehsalı başlat",type="primary",use_container_width=True)
@@ -205,7 +214,7 @@ elif page=="Video istehsalı":
                     secs = "30" if int(DUR[dur]) <= 30 else ("60" if int(DUR[dur]) >= 60 else "45")
                     dispatch({"mode":"upload" if publish!="Yalnız hazırla" else "prepare","topic":topic.strip()[:180],"duration":secs,"voice":voice},workflow=ACTIVE_WORKFLOW)
                 else:
-                    dispatch({"topic":topic.strip()[:180],"language":LANG[lang],"duration":DUR[dur],"video_format":"vertical" if fmt.startswith("Shorts") else "horizontal","voice":voice,"stock_sources":",".join(stock) or "Pixabay","subtitles":str(subs).lower(),"thumbnail":str(thumb).lower(),"seo":str(seo).lower(),"privacy":privacy,"publish":"upload" if publish!="Yalnız hazırla" else "prepare"},workflow=ACTIVE_WORKFLOW)
+                    dispatch({"topic":topic.strip()[:180],"language":LANG[lang],"duration":DUR[dur],"video_format":"vertical" if fmt.startswith("Shorts") else "horizontal","voice":voice,"voice_provider":voice_provider,"stock_sources":",".join(stock) or "Pixabay","subtitles":str(subs).lower(),"thumbnail":str(thumb).lower(),"seo":str(seo).lower(),"privacy":privacy,"publish":"upload" if publish!="Yalnız hazırla" else "prepare"},workflow=ACTIVE_WORKFLOW)
                 st.success("Əmr GitHub Actions-a göndərildi.")
             except Exception as e: st.error(str(e))
 
