@@ -1,0 +1,43 @@
+name: Build Talyhs Studio Windows x64 launcher
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "desktop_launcher.py"
+      - ".github/workflows/build-studio-launcher.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+      - name: Install packager
+        run: python -m pip install --upgrade pip pyinstaller
+      - name: Run launcher self-test
+        run: python desktop_launcher.py --self-test
+      - name: Build Windows x64 EXE
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name TalyhsStudioLauncher desktop_launcher.py
+      - name: Smoke test executable
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/TalyhsStudioLauncher.exe")) { throw "EXE was not produced." }
+          $file = Get-Item "dist/TalyhsStudioLauncher.exe"
+          if ($file.Length -lt 100000) { throw "EXE looks unexpectedly small." }
+          Write-Host "EXE built: $($file.Length) bytes"
+      - name: Upload Windows x64 EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalyhsStudio-Windows-x64
+          path: dist/TalyhsStudioLauncher.exe
+          if-no-files-found: error
+          retention-days: 30
