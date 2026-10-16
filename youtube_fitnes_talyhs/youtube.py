@@ -209,7 +209,7 @@ def footage_queries(data):
     candidates = supplied[:2] + [f"{topic} exercise demonstration", f"{title} proper form"] + supplied[2:]
     result, seen = [], set()
     for query in candidates:
-        query = re.sub(r"\\s+", " ", str(query)).strip()
+        query = re.sub(r"\s+", " ", str(query)).strip()
         key = query.casefold()
         if not query or key in seen:
             continue
