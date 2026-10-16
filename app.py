@@ -16,7 +16,7 @@ PASSWORD=os.getenv("DASHBOARD_PASSWORD","").strip()
 DB=Path(os.getenv("STUDIO_DB_PATH","studio_calendar.sqlite3"))
 HEADERS={"Accept":"application/vnd.github+json","Authorization":f"Bearer {GH_TOKEN}","X-GitHub-Api-Version":"2022-11-28","User-Agent":"Talyhs-YouTube-Studio"}
 LANG={"Azərbaycan dili":"az","English":"en","Türkçe":"tr"}
-DUR={"30 saniyə":"30","50 saniyə":"50","55 saniyə":"55","1 dəqiqə":"60","3 dəqiqə":"180","5 dəqiqə":"300","10 dəqiqə":"600","10 dəqiqə 1 saniyə":"601"}
+DUR={"30 saniyə":"30","45 saniyə":"45","50 saniyə":"50","55 saniyə":"55","1 dəqiqə":"60","3 dəqiqə":"180","5 dəqiqə":"300","10 dəqiqə":"600","10 dəqiqə 1 saniyə":"601"}
 
 st.markdown("""<style>
 .stApp{background:radial-gradient(ellipse at 10% 0%,#17213b 0%,#0b1020 45%,#080b14 100%);color:#eef2ff}
