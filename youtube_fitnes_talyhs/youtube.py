@@ -205,10 +205,8 @@ def footage_queries(data):
     """Build specific search queries from the actual topic, not generic gym footage."""
     topic = str(data.get("topic") or data.get("title") or "beginner fitness").strip()
     title = str(data.get("title") or topic).strip()
-    candidates = parse_list(data.get("search_terms", [])) + [
-        f"{topic} exercise demonstration",
-        f"{title} proper form",
-    ]
+    supplied = parse_list(data.get("search_terms", []))
+    candidates = supplied[:2] + [f"{topic} exercise demonstration", f"{title} proper form"] + supplied[2:]
     result, seen = [], set()
     for query in candidates:
         query = re.sub(r"\\s+", " ", str(query)).strip()
@@ -287,7 +285,7 @@ def download_clips(terms):
 
 async def make_voice(script):
     path=TMP/"voice.mp3"
-    await edge_tts.Communicate(script,VOICE,rate="+0%").save(str(path))
+    await edge_tts.Communicate(script,VOICE,rate="-10%").save(str(path))
     if not path.exists() or path.stat().st_size<1000: raise RuntimeError("Could not generate voice audio")
     return path
 
