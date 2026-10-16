@@ -165,7 +165,7 @@ def generate_text(prompt):
         item.strip()
         for item in os.getenv(
             "GEMINI_FALLBACK_MODELS",
-            "gemini-2.5-flash,gemini-2.0-flash",
+            "",
         ).split(",")
         if item.strip()
     ]
@@ -296,6 +296,19 @@ def generate_script(topic):
     is_brain_short = LANGUAGE == "az" and 40 <= target_seconds <= 60 and any(
         word in topic_lower for word in ("beyin", "brain", "neyron", "neuron")
     )
+    is_turkish_brain_short = LANGUAGE == "tr" and 30 <= target_seconds <= 60 and any(
+        word in topic_lower for word in ("beyin", "brain", "beyniniz", "beynimiz")
+    )
+    turkish_brain_short_fallback = (
+        "Beyniniz hakkında sizi şaşırtacak üç gerçek! Birincisi, beynin kendi dokusunda "
+        "ağrı reseptörleri bulunmaz. Baş ağrısı genellikle beynin çevresindeki yapılardan "
+        "kaynaklanır. İkincisi, siz uyurken beyniniz çalışmayı sürdürür; uyku, öğrenilen "
+        "bilgilerin işlenmesine ve anıların güçlenmesine yardımcı olur. Üçüncüsü, beyniniz "
+        "öğrenme sırasında değişebilir. Yeni beceriler geliştirdikçe sinir hücreleri "
+        "arasındaki bağlantılar güçlenebilir veya yeniden düzenlenebilir. Yani öğrenmek "
+        "beyninizin bağlantılarını zamanla değiştirebilir. Bu üç bilgiden hangisi sizi "
+        "en çok şaşırttı? Yorumlara yazın ve daha fazla ilginç bilgi için takipte kalın!"
+    )
     brain_short_fallback = (
         "İnsan beyni bədənimizin idarəetmə mərkəzidir. O, nəfəs almaqdan yaddaşa "
         "qədər saysız-hesabsız prosesi koordinasiya edir. Birinci fakt: beyin özü "
@@ -328,6 +341,10 @@ Return only the narration, without markdown, title, URL or stage directions.
         if LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
             script = load_pharaohs_fallback_script()
             fallback_used = True
+        elif is_turkish_brain_short:
+            script = turkish_brain_short_fallback
+            fallback_used = True
+            print("WARNING: Gemini unavailable; using built-in Turkish brain Shorts fallback.")
         elif is_brain_short:
             script = brain_short_fallback
             print("WARNING: Gemini əlçatan deyil; beyin mövzusu üçün daxili 50 saniyəlik Azərbaycan ssenarisi istifadə olunur.")
@@ -345,6 +362,10 @@ Return only the narration, without markdown, title, URL or stage directions.
             corrected_count = count_script_words(corrected)
             if min_words * 0.8 <= corrected_count <= max_words * 1.2:
                 script, word_count = corrected, corrected_count
+            elif is_turkish_brain_short:
+                script = turkish_brain_short_fallback
+                word_count = count_script_words(script)
+                fallback_used = True
             elif is_brain_short:
                 script = brain_short_fallback
                 word_count = count_script_words(script)
@@ -358,7 +379,12 @@ Return only the narration, without markdown, title, URL or stage directions.
             else:
                 raise RuntimeError(f"Script length {corrected_count} is outside the target range.")
         except Exception as exc:
-            if is_brain_short:
+            if is_turkish_brain_short:
+                print(f"Correction unavailable; using built-in Turkish brain Shorts fallback: {exc}")
+                script = turkish_brain_short_fallback
+                word_count = count_script_words(script)
+                fallback_used = True
+            elif is_brain_short:
                 print(f"Correction unavailable, using built-in brain Shorts fallback: {exc}")
                 script = brain_short_fallback
                 word_count = count_script_words(script)
