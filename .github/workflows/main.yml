@@ -26,13 +26,13 @@ on:
         required: true
         type: choice
         options: ["30", "45", "50", "55", "60", "180", "300", "600", "601"]
-        default: "600"
+        default: "55"
       video_format:
         description: "Üfüqi = adi YouTube video; şaquli = Shorts"
         required: true
         type: choice
         options: [horizontal, vertical]
-        default: horizontal
+        default: vertical
       voice:
         description: "Səsin cinsi — seçilən AI səs provayderində tətbiq olunur"
         required: true
@@ -95,7 +95,7 @@ jobs:
     env:
       VIDEO_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
       VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || 'tr' }}
-      TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '50' }}
+      TARGET_VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '55' }}
       VIDEO_FORMAT: ${{ github.event_name == 'workflow_dispatch' && inputs.video_format || 'vertical' }}
       VOICE_GENDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice || 'male' }}
       VOICE_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.voice_provider || 'ema' }}
@@ -104,7 +104,7 @@ jobs:
       CREATE_THUMBNAIL: ${{ github.event_name == 'workflow_dispatch' && inputs.thumbnail || 'true' }}
       ENABLE_SEO: ${{ github.event_name == 'workflow_dispatch' && inputs.seo || 'true' }}
       YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy || 'public' }}
-      AUTOMATION_END_DATE: '2027-10-14'
+      AUTOMATION_END_DATE: '2027-10-11'
       TIMEZONE: Europe/Istanbul
       PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish || 'upload' }}
 
