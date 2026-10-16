@@ -61,10 +61,10 @@ def test_upload_requires_explicit_confirmation(monkeypatch):
 
 
 
-def test_fitness_topics_are_turkish():
-    assert any("Şınav" in title for title, _ in youtube.IDEAS)
+def test_fitness_topics_and_default_voice_are_english():
+    assert any("Push-Up" in title for title, _ in youtube.IDEAS)
     assert any("Squat" in title for title, _ in youtube.IDEAS)
-    assert youtube.VOICE == "tr-TR-EmelNeural"
+    assert youtube.VOICE == "en-US-AriaNeural"
 
 
 def test_montage_allocates_runtime_across_clips():
@@ -73,13 +73,13 @@ def test_montage_allocates_runtime_across_clips():
     assert youtube.clip_segment_seconds(0, 45) == 45
 
 
-def test_fallback_script_is_turkish():
-    text = youtube.fallback_script("şınav tekniği")
-    assert "Bugün" in text
-    assert "kontrollü" in text
+def test_fallback_script_is_english():
+    text = youtube.fallback_script("push-up technique")
+    assert "Today" in text
+    assert "controlled" in text
 
 
-def test_turkish_topic_maps_to_specific_english_stock_searches():
-    terms = youtube.fallback_footage_terms("Şınavda yapılan 3 hata", "Şınavda Yapılan 3 Hata")
+def test_english_topic_maps_to_specific_stock_searches():
+    terms = youtube.fallback_footage_terms("3 Push-Up Mistakes to Avoid", "3 Push-Up Mistakes to Avoid")
     assert "push-up" in terms[0]
     assert all(terms)
