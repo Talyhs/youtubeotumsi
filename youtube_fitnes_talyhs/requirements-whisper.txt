@@ -1,0 +1,2 @@
+# Optional, open-source word-level caption alignment. First install can be large because PyTorch is a dependency.
+openai-whisper>=20240930
