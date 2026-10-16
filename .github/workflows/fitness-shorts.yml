@@ -12,7 +12,7 @@ on:
           - prepare
           - upload
   schedule:
-    # Azerbaijan time (UTC+4): 07:30, 12:00, 18:30. Scheduled runs only prepare videos.
+    # Turkey time (UTC+3): 07:30, 12:00, 18:30. Scheduled runs only prepare videos.
     - cron: "30 4 * * *"
     - cron: "0 9 * * *"
     - cron: "30 15 * * *"
