@@ -37,3 +37,20 @@ def test_captions_are_created_with_estimated_timing(tmp_path, monkeypatch):
     assert "[Events]" in content
     assert "Dialogue:" in content
     assert r"{\kf" in content
+
+def test_footage_queries_include_exact_topic_and_deduplicate():
+    data = {
+        "title": "Better Push-Up Form",
+        "topic": "proper push-up form for beginners",
+        "search_terms": ["push-up form demonstration", "push-up form demonstration"],
+    }
+    queries = youtube.footage_queries(data)
+    assert queries[0] == "push-up form demonstration"
+    assert len(queries) == len({query.casefold() for query in queries})
+    assert any("proper push-up form" in query for query in queries)
+
+
+def test_upload_requires_explicit_confirmation(monkeypatch, capsys):
+    monkeypatch.setattr(youtube, "MODE", "prepare")
+    youtube.upload("unused.mp4", {"title": "Test"}, [])
+    assert "not uploaded" in capsys.readouterr().out
