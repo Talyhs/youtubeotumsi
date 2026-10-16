@@ -37,5 +37,9 @@ jobs:
           assert 'GH_TOKEN' in app and 'GH_TOKEN' in render
           assert 'GITHUB_REPOSITORY' in app and 'Talyhs/youtubeotumsi' in render
           assert 'AI səs mühərriki' in app
-          print("Dashboard configuration checks passed.")
+          workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
+          assert 'options: ["30", "45", "50"' in workflow
+          assert "inputs.publish || 'prepare'" in workflow
+          assert "inputs.privacy || 'private'" in workflow
+          print("Dashboard configuration and safe workflow defaults passed.")
           PY
