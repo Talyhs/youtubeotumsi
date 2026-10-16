@@ -28,7 +28,7 @@ API anahtarlarını veya OAuth token'ını kaynak koda yazma.
 - `FITNESS_YOUTUBE_CHANNEL_ID` = `UC7_pFbnnuMWT_US47_FD6MDA`
 - `FITNESS_ALLOW_PUBLIC_UPLOAD` = `NO` (test tamamlanana kadar böyle bırak)
 - `EDGE_TTS_VOICE` = `tr-TR-EmelNeural` (isteğe bağlı varsayılan ses)
-- `GEMINI_MODEL` = `gemini-2.5-flash` (hesabında kullanılabilen bir model seç)
+- `GEMINI_MODEL` = `gemini-3.8-flash` (API hesabında kullanılabiliyorsa; aksi durumda kullanılabilir bir model adı gir)
 
 ## İlk test — yayınlama yapmadan
 1. Yukarıdaki Secrets ve Variables değerlerini GitHub'da ayarla.
