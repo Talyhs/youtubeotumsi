@@ -39,8 +39,8 @@ def validate_video(path: str | Path, expected_seconds: int = 45) -> dict:
                 issues.append("Video is not 1080x1920 vertical format.")
         if not audio:
             issues.append("No audio stream found.")
-        if duration < 25 or duration > expected_seconds + 2:
-            issues.append(f"Unexpected duration: {duration:.1f}s.")
+        if duration < max(25, expected_seconds * 0.85) or duration > expected_seconds + 2:
+            issues.append(f"Unexpected duration: {duration:.1f}s for a {expected_seconds}s target.")
         if duration < expected_seconds - 3:
             warnings.append(f"Rendered video is shorter than target ({duration:.1f}s vs {expected_seconds}s).")
         return {
