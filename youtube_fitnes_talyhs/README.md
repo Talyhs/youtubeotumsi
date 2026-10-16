@@ -9,7 +9,10 @@ This folder creates English-language fitness Shorts for the separate second YouT
 - Runtime-aware narration targets: approximately 52–72 words (30s), 82–105 words (45s), or 112–135 words (60s); rejected scripts use a duration-matched fallback
 - Pexels and Pixabay stock footage search and downloads
 - Microsoft Edge neural text-to-speech using `en-US-AriaNeural` (natural US English female voice)
+- Topic-specific footage queries with query-result interleaving, duplicate removal, and Pixabay tag mismatch rejection to reduce unrelated footage
 - FFmpeg montage and burned-in English karaoke captions: large bold text, dark outline/shadow, short readable phrase beats, and moving yellow word highlighting synchronized across the narration
+- Automatic post-render checks for vertical 1080×1920 video, audio presence, file size, and duration; a failed quality check blocks upload
+- Automatic 1280×720 thumbnail based on a frame from the finished video, plus `output/review_manifest.json` documenting quality results and an unapproved review status
 - A separate `output/subtitles.ass` caption file is saved with the generated video for review and future style tweaks
 - Optional open-source OpenAI Whisper word-level timestamps for tighter caption synchronization; estimated timing remains the fallback
 - Automated helper tests, critical-error lint checks, and weekly Dependabot update PRs
@@ -46,6 +49,7 @@ The OAuth token should include:
 Open **Settings → Secrets and variables → Actions → Variables** and add:
 - `FITNESS_YOUTUBE_CHANNEL_ID` = `UC7_pFbnnuMWT_US47_FD6MDA`
 - `FITNESS_ALLOW_PUBLIC_UPLOAD` = `NO` until testing is complete
+- Public upload requires both `mode = upload`, the manual `confirm_upload` checkbox, and `FITNESS_ALLOW_PUBLIC_UPLOAD = YES`
 - `EDGE_TTS_VOICE` = `en-US-AriaNeural`
 - `GEMINI_MODEL` = `gemini-2.5-flash`
 
@@ -63,9 +67,9 @@ For local checks, install development tools with `python -m pip install -r youtu
 1. Add the API keys and Variables.
 2. Open GitHub → **Actions → English Fitness Shorts Bot → Run workflow**.
 3. Choose `prepare` and click **Run workflow**.
-4. When it finishes, download **Artifacts → youtube-fitness-shorts** and check the English narration, video relevance, subtitles, and credits.
+4. When it finishes, download **Artifacts → youtube-fitness-shorts** and check the English narration, video relevance, subtitles, credits, `thumbnail.jpg`, and `review_manifest.json`.
 5. Verify the OAuth token belongs to the intended second channel.
-6. Only after testing, set `FITNESS_ALLOW_PUBLIC_UPLOAD=YES` and manually choose `upload`.
+6. Only after testing, set `FITNESS_ALLOW_PUBLIC_UPLOAD=YES`, manually choose `upload`, and tick `confirm_upload` after reviewing the exact output. Leave it unchecked for normal preparation.
 
 ## Local Windows setup
 Install Python 3.11+ and FFmpeg, then run in PowerShell:
