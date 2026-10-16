@@ -8,6 +8,7 @@ import edge_tts
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from quality import create_thumbnail, validate_video, write_review_manifest
 
 ROOT = Path(__file__).resolve().parent
 OUT, TMP = ROOT / "output", ROOT / "tmp"
@@ -184,7 +185,7 @@ def pexels(q):
         files=[f for f in v.get("video_files",[]) if f.get("link") and f.get("file_type")=="video/mp4"]
         if files:
             files.sort(key=lambda f:(f.get("width",0)<f.get("height",0),f.get("width",0)),reverse=True)
-            out.append({"url":files[0]["link"],"credit":f"Pexels video by {v.get('user',{}).get('name','creator')}","page":v.get("url","")})
+            out.append({"url":files[0]["link"],"credit":f"Pexels video by {v.get('user',{}).get('name','creator')}","page":v.get("url","") ,"query":q,"tags":[]})
     return out
 
 def pixabay(q):
@@ -193,7 +194,7 @@ def pixabay(q):
     out=[]
     for v in r.json().get("hits",[]):
         variants=v.get("videos",{}); f=variants.get("medium") or variants.get("small") or variants.get("large")
-        if f and f.get("url"): out.append({"url":f["url"],"credit":f"Pixabay video by {v.get('user','creator')}","page":v.get("pageURL","")})
+        if f and f.get("url"): out.append({"url":f["url"],"credit":f"Pixabay video by {v.get('user','creator')}","page":v.get("pageURL","") ,"query":q,"tags":parse_list(v.get('tags',''))})
     return out
 
 def download_clips(terms):
@@ -202,9 +203,16 @@ def download_clips(terms):
         for fn in (pexels,pixabay):
             try: all_clips.extend(fn(q))
             except Exception as e: print(f"WARNING: stock search error for {q}: {e}")
-    random.shuffle(all_clips); used=set(); paths=[]; credits=[]
+    # Keep provider relevance order instead of randomizing clips. A topic-specific query should not be diluted by generic gym footage.
+    used=set(); paths=[]; credits=[]
     for clip in all_clips:
         if clip["url"] in used: continue
+        tags = " ".join(clip.get("tags", [])).lower()
+        query_words = {w for w in re.findall(r"[a-z0-9]+", clip.get("query", "").lower()) if len(w) > 2}
+        tag_words = {w for w in re.findall(r"[a-z0-9]+", tags) if len(w) > 2}
+        if tag_words and query_words and not (query_words & tag_words):
+            # Pixabay supplies tags; reject clear mismatches. Pexels does not expose equivalent tags in this endpoint.
+            continue
         used.add(clip["url"]); path=TMP/f"clip_{len(paths)+1}.mp4"
         try:
             with requests.get(clip["url"],stream=True,timeout=90) as r:
@@ -384,7 +392,7 @@ def youtube_service():
         else: raise RuntimeError("OAuth token invalid or missing refresh_token; re-authorize with upload and readonly scopes")
     return build("youtube","v3",credentials=creds,cache_discovery=False)
 
-def upload(path,data,credits):
+def upload(path,data,credits,thumbnail_path=None):
     if MODE!="upload": print("PREPARE MODE: video created; not uploaded."); return
     if not ALLOW_PUBLIC: raise RuntimeError("Upload blocked. After testing, set ALLOW_PUBLIC_UPLOAD=YES.")
     if not CHANNEL_ID: raise RuntimeError("YOUTUBE_CHANNEL_ID missing; upload blocked")
@@ -399,6 +407,12 @@ def upload(path,data,credits):
     while response is None:
         status,response=req.next_chunk()
         if status: print(f"Upload: {int(status.progress()*100)}%")
+    if thumbnail_path and Path(thumbnail_path).exists():
+        try:
+            yt.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(str(thumbnail_path), mimetype="image/jpeg")).execute()
+            print("Custom thumbnail uploaded.")
+        except Exception as exc:
+            print(f"WARNING: Video uploaded but custom thumbnail could not be set: {exc}")
     print("Uploaded:","https://www.youtube.com/watch?v="+response["id"])
 
 def main():
@@ -407,9 +421,18 @@ def main():
     clips,credits=download_clips(data.get("search_terms",["fitness workout gym"]))
     audio=asyncio.run(make_voice(data["script"]))
     video=make_video(clips,audio,data["script"])
+    quality=validate_video(video, SECONDS)
     (OUT/"video_metadata.json").write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
     (OUT/"stock_credits.txt").write_text("\n".join(credits),encoding="utf-8")
-    print("Video ready:",video); upload(video,data,credits)
+    thumbnail=OUT/"thumbnail.jpg"
+    create_thumbnail(video, data["title"], thumbnail)
+    write_review_manifest(OUT, data["title"], video, thumbnail, quality, credits)
+    print("Quality check:", json.dumps(quality, ensure_ascii=False))
+    if not quality.get("ok"):
+        raise RuntimeError("Rendered video failed quality checks; it was not uploaded. See output/review_manifest.json")
+    print("Video ready for human review:",video)
+    print("Thumbnail:",thumbnail)
+    upload(video,data,credits,thumbnail)
 
 if __name__=="__main__":
     try: main()
