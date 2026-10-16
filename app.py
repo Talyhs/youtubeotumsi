@@ -203,7 +203,7 @@ elif page=="Montaj və səs":
                 secs = "30" if int(DUR[dur]) <= 30 else ("60" if int(DUR[dur]) >= 60 else "45")
                 dispatch({"mode":"prepare","topic":topic,"duration":secs,"voice":voice},workflow=ACTIVE_WORKFLOW)
             else:
-                dispatch({"topic":topic,"language":LANG[lang],"duration":DUR[dur],"voice":voice,"voice_provider":provider,"video_format":fmt,"subtitles":str(subs).lower(),"stock_sources":",".join(stock) or "Pixabay","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"},workflow=ACTIVE_WORKFLOW)
+                dispatch({"topic":topic,"language":LANG[lang],"duration":DUR[dur],"voice":voice,"video_format":fmt,"subtitles":str(subs).lower(),"stock_sources":",".join(stock) or "Pixabay","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"},workflow=ACTIVE_WORKFLOW)
             st.success("Tapşırıq göndərildi.")
         except Exception as e: st.error(str(e))
 
@@ -232,7 +232,7 @@ elif page=="Yayım təqvimi":
                     secs = "30" if int(x["duration"]) <= 30 else ("60" if int(x["duration"]) >= 60 else "45")
                     dispatch({"mode":"prepare","topic":x["topic"],"duration":secs,"voice":"female"},workflow=ACTIVE_WORKFLOW)
                 else:
-                    dispatch({"topic":x["topic"],"language":x["language"],"duration":x["duration"],"video_format":x["video_format"],"voice":"male","voice_provider":"edge","stock_sources":"Pixabay,Pexels","subtitles":"true","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"},workflow=ACTIVE_WORKFLOW)
+                    dispatch({"topic":x["topic"],"language":x["language"],"duration":x["duration"],"video_format":x["video_format"],"voice":"male","stock_sources":"Pixabay,Pexels","subtitles":"true","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"},workflow=ACTIVE_WORKFLOW)
                 with sqlite3.connect(DB) as d:d.execute("UPDATE calendar SET status='dispatched' WHERE id=?",(x["id"],))
                 st.success("Tapşırıq göndərildi.");st.rerun()
             except Exception as e:st.error(str(e))
