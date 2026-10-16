@@ -1,66 +1,57 @@
-# youtube_fitnes_talyhs — English Fitness Shorts Automation
+# English Fitness Shorts Automation
 
-This folder creates English-language fitness Shorts for the separate second YouTube channel.
+This module creates 30–60 second **English-only** vertical fitness videos for your separate fitness YouTube channel. Titles, narration, on-screen captions, descriptions, hashtags, and stock-footage search terms must all be in English.
 
 ## Features
-- Vertical MP4 output at 1080×1920, default 45 seconds (configurable from 30–60 seconds)
-- Original English fitness scripts with a fallback script if Gemini is unavailable
-- Pexels and Pixabay stock footage search and downloads
-- Microsoft Edge neural text-to-speech using `en-US-AriaNeural` (natural US English female voice)
-- FFmpeg montage and burned-in subtitles
-- English title, description, hashtags, and stock-footage credits
+- 1080×1920 vertical MP4, default 45 seconds (30/45/60 selectable)
+- Natural, conversational American English narration; reviewed fallback script if AI generation is unavailable
+- Edge TTS neural voices: female `en-US-AriaNeural` (default), male `en-US-GuyNeural`
+- Topic-specific Pexels and Pixabay stock footage; duplicate removal and relevance checks
+- FFmpeg montage, burned-in English karaoke captions, and separate `output/subtitles.ass`
+- Optional Whisper word-level caption timing; estimated timing fallback if unavailable
+- Output resolution, audio stream, file size, and duration validation
+- 1280×720 thumbnail, SEO title/description/tags, footage credits, and `output/review_manifest.json`
+- Safe default: prepare only; publishing requires explicit human approval
 - Verifies the OAuth account can access the configured target channel before upload
-- Scheduled runs prepare videos only; public upload remains blocked by default
 
-## Voice
-Default: `en-US-AriaNeural` — English (United States), neural female voice.
-Alternatives: `en-US-JennyNeural` for another female voice, or `en-US-ChristopherNeural` for a male voice. Set the GitHub Actions Variable `EDGE_TTS_VOICE` to change it.
-
-This uses Edge TTS, a neural voice service requiring an internet connection. It is not ElevenLabs, and voice availability can change.
-
-## GitHub Actions
-Workflow: [English Fitness Shorts Bot](../.github/workflows/fitness-shorts.yml)
-
-The schedule attempts three video-preparation runs daily at 07:30, 12:00, and 18:30 Turkey time (UTC+3). GitHub scheduled workflows may be delayed. Videos are saved in the run's `youtube-fitness-shorts` artifact ZIP. Scheduled runs do not publish automatically.
-
-## GitHub Secrets
+## GitHub Actions Secrets
 Open **Settings → Secrets and variables → Actions → Secrets** and add:
-- `PEXELS_API_KEY`
-- `PIXABAY_API_KEY`
-- `GEMINI_API_KEY` (optional; enables AI script generation)
-- `FITNESS_TOKEN_JSON` (OAuth token JSON for the second channel; never commit it to the repository)
+- `PEXELS_API_KEY` — Pexels API key
+- `PIXABAY_API_KEY` — Pixabay API key
+- `GEMINI_API_KEY` — Gemini API key
+- `FITNESS_TOKEN_JSON` — OAuth token JSON for the fitness channel only
 
-The OAuth token should include:
-- `https://www.googleapis.com/auth/youtube.upload`
-- `https://www.googleapis.com/auth/youtube.readonly`
+Never put API keys or OAuth tokens in source code.
 
-## GitHub Variables
-Open **Settings → Secrets and variables → Actions → Variables** and add:
+## GitHub Actions Variables
+Under **Settings → Secrets and variables → Actions → Variables**:
 - `FITNESS_YOUTUBE_CHANNEL_ID` = `UC7_pFbnnuMWT_US47_FD6MDA`
 - `FITNESS_ALLOW_PUBLIC_UPLOAD` = `NO` until testing is complete
-- `EDGE_TTS_VOICE` = `en-US-AriaNeural`
-- `GEMINI_MODEL` = `gemini-2.5-flash`
+- `EDGE_TTS_VOICE` = `en-US-AriaNeural` (optional default)
+- `GEMINI_MODEL` = `gemini-3.8-flash` if supported by your API account; otherwise use a currently available model
 
-## First test
-1. Add the API keys and Variables.
-2. Open GitHub → **Actions → English Fitness Shorts Bot → Run workflow**.
-3. Choose `prepare` and click **Run workflow**.
-4. When it finishes, download **Artifacts → youtube-fitness-shorts** and check the English narration, video relevance, subtitles, and credits.
-5. Verify the OAuth token belongs to the intended second channel.
-6. Only after testing, set `FITNESS_ALLOW_PUBLIC_UPLOAD=YES` and manually choose `upload`.
+## First test — do not publish
+1. Configure the Secrets and Variables above.
+2. Open **Actions → English Fitness Shorts Bot → Run workflow**.
+3. Choose `mode=prepare`, `duration=45`, `voice=female`. Use topic `3 Push-Up Mistakes to Avoid`.
+4. Run the workflow and wait for it to finish.
+5. Download **Artifacts → youtube-fitness-shorts**.
+6. Watch and listen to `fitness_shorts.mp4` from beginning to end. Check English pronunciation, captions, relevant footage, thumbnail, and source credits.
+7. Check `output/review_manifest.json`; `publish_authorized: false` is expected until you explicitly approve.
+
+## Publishing safety
+Only after you personally review and approve the video:
+- Set `FITNESS_ALLOW_PUBLIC_UPLOAD=YES`.
+- Run the workflow with `mode=upload`.
+- Tick `confirm_upload`.
+- Confirm the OAuth token can access channel `UC7_pFbnnuMWT_US47_FD6MDA`.
+
+Scheduled runs prepare videos only; they do not publish publicly. A real stock-video render, API keys, and OAuth token must be tested in GitHub Actions before claiming the end-to-end pipeline works.
 
 ## Local Windows setup
-Install Python 3.11+ and FFmpeg, then run in PowerShell:
+Install Python 3.11+ and FFmpeg. From the repository root in PowerShell:
 ```powershell
-cd youtube_fitnes_talyhs
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-$env:PEXELS_API_KEY = "YOUR_API_KEY"
-$env:PIXABAY_API_KEY = "YOUR_API_KEY"
-$env:EDGE_TTS_VOICE = "en-US-AriaNeural"
-$env:PUBLISH_MODE = "prepare"
-python youtube.py
+python -m pip install -r youtube_fitnes_talyhs/requirements.txt
+python youtube_fitnes_talyhs/youtube.py
 ```
-
-Never store real API keys or OAuth tokens in source code. Check stock footage licensing and the accuracy of fitness information before publishing. This content is general education, not medical advice.
+The default mode is `prepare`, so the video is generated but not uploaded.

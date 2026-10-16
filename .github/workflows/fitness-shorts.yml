@@ -1,10 +1,16 @@
 name: English Fitness Shorts Bot
 
 on:
+  pull_request:
+    paths:
+      - 'youtube_fitnes_talyhs/**'
+      - '.github/workflows/fitness-shorts.yml'
+      - '.github/dependabot.yml'
+      - 'tests/**'
   workflow_dispatch:
     inputs:
       mode:
-        description: "prepare = create video only; upload = upload to the verified second channel"
+        description: "prepare = prepare = create a video only; upload = publish to the verified fitness channel"
         type: choice
         required: true
         default: prepare
@@ -12,12 +18,12 @@ on:
           - prepare
           - upload
       topic:
-        description: "Optional fitness Short topic"
+        description: "Optional fitness Shorts topic"
         type: string
         required: false
         default: ""
       duration:
-        description: "Video duration in seconds"
+        description: "Video duration (seconds)"
         type: choice
         required: true
         default: "45"
@@ -34,6 +40,19 @@ on:
           - female
           - male
           - auto
+      confirm_upload:
+        description: "Explicitly approve publishing this run (required when mode=upload)"
+        type: boolean
+        required: true
+        default: false
+      whisper:
+        description: "Use Whisper for word-level caption timing (first run is slower)"
+        type: choice
+        required: true
+        default: "no"
+        options:
+          - "no"
+          - "yes"
   schedule:
     # Turkey time (UTC+3): 07:30, 12:00, 18:30. Scheduled runs only prepare videos.
     - cron: "30 4 * * *"
@@ -48,7 +67,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install -r youtube_fitnes_talyhs/requirements.txt -r youtube_fitnes_talyhs/requirements-dev.txt
+      - name: Check Python syntax
+        run: python -m py_compile youtube_fitnes_talyhs/youtube.py youtube_fitnes_talyhs/quality.py
+      - name: Lint critical Python errors
+        run: ruff check --select E9,F63,F7,F82 youtube_fitnes_talyhs tests
+      - name: Run unit tests
+        run: pytest -q
+
   build:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -56,13 +93,15 @@ jobs:
       FITNESS_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
       VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '45' }}
       EDGE_TTS_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'en-US-GuyNeural' || github.event_name == 'workflow_dispatch' && inputs.voice == 'female' && 'en-US-AriaNeural' || vars.EDGE_TTS_VOICE || 'en-US-AriaNeural' }}
-      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
       TOKEN_JSON: ${{ secrets.FITNESS_TOKEN_JSON }}
       YOUTUBE_CHANNEL_ID: ${{ vars.FITNESS_YOUTUBE_CHANNEL_ID }}
       ALLOW_PUBLIC_UPLOAD: ${{ vars.FITNESS_ALLOW_PUBLIC_UPLOAD || 'NO' }}
+      CONFIRM_UPLOAD: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_upload == true && 'YES' || 'NO' }}
+      USE_WHISPER_CAPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.whisper == 'yes' && 'YES' || vars.USE_WHISPER_CAPTIONS || 'NO' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +115,10 @@ jobs:
       - name: Install Python dependencies
         working-directory: youtube_fitnes_talyhs
         run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Install optional Whisper alignment engine
+        if: env.USE_WHISPER_CAPTIONS == 'YES'
+        working-directory: youtube_fitnes_talyhs
+        run: pip install -r requirements-whisper.txt
       - name: Validate configuration
         shell: bash
         run: |
@@ -86,6 +129,7 @@ jobs:
           if [[ "$PUBLISH_MODE" == "upload" ]]; then
             [[ -n "$TOKEN_JSON" ]] || { echo "Missing FITNESS_TOKEN_JSON secret"; exit 1; }
             [[ -n "$YOUTUBE_CHANNEL_ID" ]] || { echo "Missing FITNESS_YOUTUBE_CHANNEL_ID variable"; exit 1; }
+            [[ "$CONFIRM_UPLOAD" == "YES" ]] || { echo "Upload blocked. Tick confirm_upload only after reviewing the generated video."; exit 1; }
             [[ "$ALLOW_PUBLIC_UPLOAD" == "YES" ]] || { echo "Upload blocked. Set FITNESS_ALLOW_PUBLIC_UPLOAD=YES only after testing."; exit 1; }
           fi
       - name: Generate fitness Short
