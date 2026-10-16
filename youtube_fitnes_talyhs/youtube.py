@@ -68,7 +68,7 @@ def topic_data():
         "title": title, "topic": topic,
         "script": "You do not need a perfect plan to get started. Begin with a small, safe step today. Warm up with a few easy movements before training. During a squat, keep your feet about shoulder-width apart, move with control, and breathe naturally. If a push-up feels too difficult, try wall push-ups first. Stop if you feel sharp pain and choose exercises that match your current ability. Consistency matters more than trying to do everything in one day. Save this video and take one positive step for your fitness today!",
         "search_terms": ["fitness workout gym exercise", "person exercising at home"],
-        "description": "Başlangıç seviyesine uygun fitness önerileri. Hareketleri kendi seviyene göre uyarlayın; ağrı hissederseniz durun.",
+        "description": "Beginner-friendly fitness tips. Adapt exercises to your ability and stop if you feel pain.",
         "hashtags": ["#fitness", "#shorts", "#workout", "#exercise"]
     }
 
