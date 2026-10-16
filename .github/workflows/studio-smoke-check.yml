@@ -1,0 +1,41 @@
+name: Talyhs Studio smoke checks
+
+on:
+  push:
+    branches:
+      - "fix/modern-studio-reliability"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  python-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile dashboard and automation modules
+        run: |
+          python -m py_compile app.py youtube.py
+          if [ -f youtube_fitnes_talyhs/youtube.py ]; then
+            python -m py_compile youtube_fitnes_talyhs/youtube.py
+          fi
+      - name: Check required dashboard configuration is documented
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          app = Path("app.py").read_text(encoding="utf-8")
+          render = Path("render.yaml").read_text(encoding="utf-8")
+          assert 'DASHBOARD_PASSWORD' in app and 'DASHBOARD_PASSWORD' in render
+          assert 'GH_TOKEN' in app and 'GH_TOKEN' in render
+          assert 'GITHUB_REPOSITORY' in app and 'Talyhs/youtubeotumsi' in render
+          assert 'AI səs mühərriki' in app
+          print("Dashboard configuration checks passed.")
+          PY
