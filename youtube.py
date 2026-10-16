@@ -329,8 +329,14 @@ def generate_script(topic):
 Write a natural spoken YouTube narration in {language_name}.
 Topic: {topic}
 Target duration: {target_seconds} seconds. Aim for {min_words}-{max_words} words.
-Use an engaging opening, accurate facts, short natural sentences, and a concise ending.
-Do not invent statistics, citations or unsupported claims.
+Structure the narration for high retention:
+- First 1-2 sentences must create curiosity immediately; no greeting or generic introduction.
+- Deliver the promised answer quickly, then explain 2-3 memorable facts in short spoken Turkish.
+- Use a clear mini-story or surprising contrast, smooth transitions, and a satisfying payoff near the end.
+- Keep one central idea, natural conversational Turkish, and sentences easy to understand on a phone.
+- End with one specific question that invites a real comment; avoid begging for likes/subscriptions.
+- Make every factual claim defensible. Do not invent statistics, citations, studies, or unsupported claims.
+- Avoid repetition, filler, exaggerated certainty, and clickbait that the video does not deliver.
 Return only the narration, without markdown, title, URL or stage directions.
 """
     fallback_used = False
@@ -414,9 +420,15 @@ def generate_metadata(script):
         description = f"Discover interesting facts about {topic}. Watch to the end and share your thoughts.\n\nNARRATION:\n{script.strip()}\n\n#Facts #Learning #Science"
         tags = (topic_words + ["interesting facts", "educational", "science", "learn"])[:15]
     elif LANGUAGE == "tr":
-        title = f"{topic} | İlginç Bilgiler"[:100]
-        description = f"{topic} hakkında ilginç bilgiler. Sonuna kadar izleyin ve düşüncelerinizi yorumlarda paylaşın.\n\nVİDEO METNİ:\n{script.strip()}\n\n#İlginçBilgiler #Bilim #Öğren"
-        tags = (topic_words + ["ilginç bilgiler", "eğitim", "bilim", "öğren"])[:15]
+        title = f"{topic} | Şaşırtıcı Gerçekler #Shorts"[:100]
+        description = (
+            f"{topic} hakkında kısa, anlaşılır ve merak uyandıran bilgiler. "
+            "Videoda konunun en ilginç yönlerini keşfedin ve sonundaki ayrıntıyı kaçırmayın. "
+            "Sizce en şaşırtıcı bölüm hangisi? Yorumlara yazın.\\n\\n"
+            f"Araz Şahverdizadə kanalında bilim, tarih, teknoloji, doğa ve günlük yaşamdan yeni Türkçe Shorts videoları için abone olun.\\n\\n"
+            f"VİDEO METNİ:\\n{script.strip()}\\n\\n#Shorts #İlginçBilgiler #ŞaşırtıcıGerçekler #Bilim #Keşfet"
+        )
+        tags = (topic_words + ["ilginç bilgiler", "şaşırtıcı gerçekler", "bilimsel gerçekler", "kısa bilgi", "eğitim", "keşfet"])[:15]
     else:
         title = f"{topic} | Maraqlı faktlar"[:100]
         description = f"{topic} haqqında maraqlı faktlar. Videonu sonadək izləyin və fikrinizi şərhdə yazın.\n\nVİDEODA SƏSLƏNƏN MƏTN:\n{script.strip()}\n\n#MaraqlıFaktlar #Azərbaycan #Elm"
@@ -1008,6 +1020,7 @@ def create_voice_and_subtitles(script):
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
         "Style: Default,DejaVu Sans,54,&H00FFFFFF,&H0000FFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,3,4,1,2,100,100,95,1",
+        "Style: Keyword,DejaVu Sans,48,&H0000FFFF,&H0000FFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,3,3,1,8,70,70,190,1",
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -1033,8 +1046,21 @@ def create_voice_and_subtitles(script):
             f"Default,,0,0,0,,{caption}"
         )
 
+    # Add a readable topic-keyword overlay during the opening seconds, separate from captions.
+    stop_words = {"hakkında", "neden", "nasıl", "olan", "için", "ve", "bir", "bu", "ile", "gerçekler", "bilgiler"}
+    topic_tokens = [
+        token for token in re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü]+", TOPIC)
+        if len(token) > 3 and token.lower() not in stop_words
+    ]
+    keyword_text = " • ".join(token.upper() for token in topic_tokens[:4]) or "İLGİNÇ BİLGİLER"
+    keyword_text = keyword_text.replace("{", "(").replace("}", ")")
+    overlay_end = min(5.0, audio_duration)
+    ass_lines.append(
+        f"Dialogue: 1,{ass_stamp(0)},{ass_stamp(overlay_end)},Keyword,,0,0,0,,{keyword_text}"
+    )
+
     SUBTITLE_FILE.write_text("\n".join(ass_lines) + "\n", encoding="utf-8")
-    print("Qalın, kontrastlı ASS subtitrləri və sarı vurğulu açar sözlər hazırdır.")
+    print("Senkron Türkçe altyazılar ve açılışta konuya özel anahtar kelime bandı hazırdır.")
     return audio_duration
 
 def get_audio_duration():
