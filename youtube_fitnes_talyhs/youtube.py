@@ -71,7 +71,7 @@ def topic_data():
     return {
         "title": title, "topic": topic,
         "script": f"Today's fitness focus is {topic}. Start with a comfortable pace and choose movements that match your current ability. Warm up with a few easy movements before training, keep your technique controlled, and breathe naturally. If an exercise feels too difficult, choose an easier variation rather than forcing it. Stop if you feel sharp pain. Consistency matters more than trying to do everything in one day. Save this video and take one positive step for your fitness today!",
-        "search_terms": ["fitness workout gym exercise", "person exercising at home"],
+        "search_terms": [f"{topic} fitness exercise demonstration", "fitness exercise technique demonstration"],
         "description": "Beginner-friendly fitness tips. Adapt exercises to your ability and stop if you feel pain.",
         "hashtags": ["#fitness", "#shorts", "#workout", "#exercise"]
     }
