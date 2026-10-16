@@ -83,3 +83,9 @@ def test_english_topic_maps_to_specific_stock_searches():
     terms = youtube.fallback_footage_terms("3 Push-Up Mistakes to Avoid", "3 Push-Up Mistakes to Avoid")
     assert "push-up" in terms[0]
     assert all(terms)
+
+
+def test_english_language_gate_rejects_turkish_and_accepts_english():
+    assert youtube.is_english_text("Keep your back straight and move with control.")
+    assert not youtube.is_english_text("Bugün antrenman hareketlerini doğru yap.")
+    assert not youtube.is_english_text("Şınav tekniği için dikkat et.")
