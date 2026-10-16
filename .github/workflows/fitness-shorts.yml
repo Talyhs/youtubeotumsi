@@ -1,4 +1,4 @@
-name: English Fitness Shorts Bot
+name: Turkish Fitness Shorts Bot
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "prepare = create video only; upload = upload to the verified second channel"
+        description: "prepare = yalnızca video hazırla; upload = doğrulanmış ikinci kanala yükle"
         type: choice
         required: true
         default: prepare
@@ -18,12 +18,12 @@ on:
           - prepare
           - upload
       topic:
-        description: "Optional fitness Short topic"
+        description: "İsteğe bağlı fitness Shorts konusu"
         type: string
         required: false
         default: ""
       duration:
-        description: "Video duration in seconds"
+        description: "Video süresi (saniye)"
         type: choice
         required: true
         default: "45"
@@ -32,7 +32,7 @@ on:
           - "45"
           - "60"
       voice:
-        description: "English neural voice"
+        description: "Türkçe sinirsel ses"
         type: choice
         required: true
         default: female
@@ -46,7 +46,7 @@ on:
         required: true
         default: false
       whisper:
-        description: "Use Whisper for word-level subtitle timing (slower first run)"
+        description: "Kelime düzeyinde altyazı zamanlaması için Whisper kullan (ilk çalıştırma daha yavaş)"
         type: choice
         required: true
         default: "no"
@@ -92,7 +92,7 @@ jobs:
       PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'prepare' }}
       FITNESS_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
       VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '45' }}
-      EDGE_TTS_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'en-US-GuyNeural' || github.event_name == 'workflow_dispatch' && inputs.voice == 'female' && 'en-US-AriaNeural' || vars.EDGE_TTS_VOICE || 'en-US-AriaNeural' }}
+      EDGE_TTS_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'tr-TR-AhmetNeural' || github.event_name == 'workflow_dispatch' && inputs.voice == 'female' && 'tr-TR-EmelNeural' || vars.EDGE_TTS_VOICE || 'tr-TR-EmelNeural' }}
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
