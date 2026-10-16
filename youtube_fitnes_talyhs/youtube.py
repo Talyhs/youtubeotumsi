@@ -8,7 +8,10 @@ import edge_tts
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from quality import create_thumbnail, validate_video, write_review_manifest
+try:
+    from .quality import create_thumbnail, validate_video, write_review_manifest
+except ImportError:  # Running this file directly from the module directory
+    from quality import create_thumbnail, validate_video, write_review_manifest
 
 ROOT = Path(__file__).resolve().parent
 OUT, TMP = ROOT / "output", ROOT / "tmp"
@@ -25,6 +28,7 @@ VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-AriaNeural")
 REQUESTED_TOPIC = os.getenv("FITNESS_TOPIC", "").strip()
 MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 ALLOW_PUBLIC = os.getenv("ALLOW_PUBLIC_UPLOAD", "NO").upper() == "YES"
+CONFIRM_UPLOAD = os.getenv("CONFIRM_UPLOAD", "NO").upper() == "YES"
 
 IDEAS = [
     ("3 Push-Up Mistakes to Avoid", "proper push-up form for beginners"),
@@ -394,6 +398,7 @@ def youtube_service():
 
 def upload(path,data,credits,thumbnail_path=None):
     if MODE!="upload": print("PREPARE MODE: video created; not uploaded."); return
+    if not CONFIRM_UPLOAD: raise RuntimeError("Upload blocked: explicit CONFIRM_UPLOAD=YES approval is required for this manual run.")
     if not ALLOW_PUBLIC: raise RuntimeError("Upload blocked. After testing, set ALLOW_PUBLIC_UPLOAD=YES.")
     if not CHANNEL_ID: raise RuntimeError("YOUTUBE_CHANNEL_ID missing; upload blocked")
     yt=youtube_service(); result=yt.channels().list(part="snippet",mine=True,maxResults=50).execute(); channels=result.get("items",[])
