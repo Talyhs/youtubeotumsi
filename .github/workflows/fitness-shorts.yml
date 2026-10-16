@@ -1,6 +1,10 @@
 name: English Fitness Shorts Bot
 
 on:
+  pull_request:
+    paths:
+      - 'youtube_fitnes_talyhs/**'
+      - '.github/workflows/fitness-shorts.yml'
   workflow_dispatch:
     inputs:
       mode:
@@ -48,7 +52,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check Python syntax
+        run: python -m py_compile youtube_fitnes_talyhs/youtube.py
+
   build:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
