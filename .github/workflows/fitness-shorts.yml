@@ -5,6 +5,8 @@ on:
     paths:
       - 'youtube_fitnes_talyhs/**'
       - '.github/workflows/fitness-shorts.yml'
+      - '.github/dependabot.yml'
+      - 'tests/**'
   workflow_dispatch:
     inputs:
       mode:
