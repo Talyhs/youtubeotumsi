@@ -149,7 +149,9 @@ page=st.sidebar.radio("Naviqasiya",["İdarə paneli","Video istehsalı","Montaj 
 if st.sidebar.button("Çıxış"): st.session_state.studio_auth=False;st.rerun()
 st.sidebar.divider();st.sidebar.caption(f"{REPO} · workflow: {ACTIVE_WORKFLOW}")
 st.title("Talyhs YouTube Studio")
-st.caption("Peşəkar qaranlıq studiya · istehsal · montaj · yayım")
+st.caption("English Fitness Shorts Bot" if ACTIVE_CHANNEL["kind"] == "fitness" else "Peşəkar qaranlıq studiya · istehsal · montaj · yayım")
+if ACTIVE_CHANNEL["kind"] == "fitness":
+    st.info("Fitness rejimi: ingilis dilində Shorts · Edge TTS neural səs · Pexels/Pixabay görüntüləri · subtitrlər · 30/45/60 saniyə. İlk olaraq Prepare seç və videonu yoxla.")
 if not GH_TOKEN: st.warning("GH_TOKEN yoxdur. GitHub əmrləri üçün Render mühitinə token əlavə et.")
 
 if page=="İdarə paneli":
@@ -161,10 +163,10 @@ if page=="İdarə paneli":
             with st.container(border=True):
                 x,y=st.columns([4,1]);x.markdown(f"**{r.get('display_title') or r.get('name') or 'Video işi'}**");x.caption(f"#{r.get('run_number')} · {r.get('created_at','').replace('T',' ').replace('Z',' UTC')}");x.write(status(r));y.link_button("GitHub logları",r.get("html_url",f"https://github.com/{REPO}/actions"))
     except Exception as e: st.info("GitHub statusu oxunmadı: "+str(e))
-    if st.button("🧠 Azərbaycan dilində 50 saniyəlik Shorts hazırla",type="primary"):
+    if st.button("💪 English Fitness Short hazırla" if ACTIVE_CHANNEL["kind"] == "fitness" else "🧠 Azərbaycan dilində 50 saniyəlik Shorts hazırla",type="primary"):
         try:
             if ACTIVE_CHANNEL["kind"] == "fitness":
-                dispatch({"mode":"prepare","topic":"Beginner home workout tips","duration":"45","voice":"female"})
+                dispatch({"mode":"prepare","topic":"Beginner home workout tips","duration":"45","voice":"female"},workflow=ACTIVE_WORKFLOW)
             else:
                 dispatch({"topic":"İnsan beyni haqqında maraqlı faktlar","language":"az","duration":"50","video_format":"vertical","voice":"female","stock_sources":"Pixabay,Pexels","subtitles":"true","thumbnail":"true","seo":"true","privacy":"private","publish":"prepare"})
             st.success("Əmr göndərildi. Hazırlıq rejimi seçilib.")
@@ -173,9 +175,20 @@ if page=="İdarə paneli":
 elif page=="Video istehsalı":
     st.subheader("Yeni video")
     with st.form("create"):
-        topic=st.text_input("Mövzu",placeholder="Fironların gizli tarixi")
+        if ACTIVE_CHANNEL["kind"] == "fitness":
+            fitness_topics = ["Beginner Home Workout", "Fat Loss Workout", "Muscle Building Tips", "Core & Abs Workout", "Leg Day Exercises", "Upper Body Workout", "Warm-Up & Mobility", "Healthy Nutrition Tips", "Common Gym Mistakes", "Recovery & Rest Days", "Custom topic…"]
+            selected_fitness_topic = st.selectbox("Fitness mövzusu (English)", fitness_topics)
+            custom_fitness_topic = st.text_input("Öz mövzun (istəyə görə)", placeholder="e.g. 3 beginner mistakes in push-ups") if selected_fitness_topic == "Custom topic…" else ""
+            topic = custom_fitness_topic.strip() if selected_fitness_topic == "Custom topic…" else selected_fitness_topic
+        else:
+            topic=st.text_input("Mövzu",placeholder="Fironların gizli tarixi")
         a,b,c=st.columns(3);lang=a.selectbox("Dil",list(LANG),0);dur=b.selectbox("Müddət",list(DUR),1);fmt=c.selectbox("Format",["Shorts · 9:16","Standart · 16:9"])
-        a,b=st.columns(2);voice=a.selectbox("Səs",["male","female","auto"],0);stock=b.multiselect("Stok mənbələri",["Pixabay","Pexels"],["Pixabay","Pexels"]);st.caption("Fitness kanalında Edge TTS neural səs istifadə olunur; əsas kanalın səs mühərriki mövcud workflow tərəfindən idarə edilir.")
+        a,b=st.columns(2)
+        voice_options = ["female","male","auto"] if ACTIVE_CHANNEL["kind"] == "fitness" else ["male","female","auto"]
+        voice=a.selectbox("English neural voice" if ACTIVE_CHANNEL["kind"] == "fitness" else "Səs",voice_options,0)
+        stock=b.multiselect("Stok mənbələri",["Pixabay","Pexels"],["Pixabay","Pexels"])
+        if ACTIVE_CHANNEL["kind"] == "fitness": st.caption("Female: en-US-AriaNeural · Male: en-US-GuyNeural · Auto: konfiqurasiya edilmiş səs.")
+        else: st.caption("Əsas kanalın səs mühərriki mövcud workflow tərəfindən idarə edilir.")
         a,b,c=st.columns(3);subs=a.checkbox("Subtitrlər",True);thumb=b.checkbox("Thumbnail",True);seo=c.checkbox("SEO metadata",True)
         privacy=st.selectbox("Görünmə",["private","unlisted","public"],0);publish=st.radio("Əməl",["Yalnız hazırla","Hazırla və YouTube-a yüklə"],0);confirm=st.checkbox("İctimai yayımı təsdiqləyirəm. Fitness kanalının upload rejimi hazırda videonu PUBLIC yayımlayır.")
         ok=st.form_submit_button("🚀 İstehsalı başlat",type="primary",use_container_width=True)
