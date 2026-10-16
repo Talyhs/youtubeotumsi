@@ -26,7 +26,7 @@ MODE = os.getenv("PUBLISH_MODE", "prepare").lower()
 SECONDS = max(30, min(60, int(os.getenv("VIDEO_SECONDS", "45"))))
 VOICE = os.getenv("EDGE_TTS_VOICE", "tr-TR-EmelNeural")
 REQUESTED_TOPIC = os.getenv("FITNESS_TOPIC", "").strip()
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 ALLOW_PUBLIC = os.getenv("ALLOW_PUBLIC_UPLOAD", "NO").upper() == "YES"
 CONFIRM_UPLOAD = os.getenv("CONFIRM_UPLOAD", "NO").upper() == "YES"
 
