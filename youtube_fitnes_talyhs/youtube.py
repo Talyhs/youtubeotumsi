@@ -201,36 +201,89 @@ def pixabay(q):
         if f and f.get("url"): out.append({"url":f["url"],"credit":f"Pixabay video by {v.get('user','creator')}","page":v.get("pageURL","") ,"query":q,"tags":parse_list(v.get('tags',''))})
     return out
 
-def download_clips(terms):
-    all_clips=[]
-    for q in parse_list(terms)[:4]:
-        for fn in (pexels,pixabay):
-            try: all_clips.extend(fn(q))
-            except Exception as e: print(f"WARNING: stock search error for {q}: {e}")
-    # Keep provider relevance order instead of randomizing clips. A topic-specific query should not be diluted by generic gym footage.
-    used=set(); paths=[]; credits=[]
-    for clip in all_clips:
-        if clip["url"] in used: continue
-        tags = " ".join(clip.get("tags", [])).lower()
-        query_words = {w for w in re.findall(r"[a-z0-9]+", clip.get("query", "").lower()) if len(w) > 2}
-        tag_words = {w for w in re.findall(r"[a-z0-9]+", tags) if len(w) > 2}
-        if tag_words and query_words and not (query_words & tag_words):
-            # Pixabay supplies tags; reject clear mismatches. Pexels does not expose equivalent tags in this endpoint.
+def footage_queries(data):
+    """Build specific search queries from the actual topic, not generic gym footage."""
+    topic = str(data.get("topic") or data.get("title") or "beginner fitness").strip()
+    title = str(data.get("title") or topic).strip()
+    candidates = parse_list(data.get("search_terms", [])) + [
+        f"{topic} exercise demonstration",
+        f"{title} proper form",
+    ]
+    result, seen = [], set()
+    for query in candidates:
+        query = re.sub(r"\\s+", " ", str(query)).strip()
+        key = query.casefold()
+        if not query or key in seen:
             continue
-        used.add(clip["url"]); path=TMP/f"clip_{len(paths)+1}.mp4"
+        seen.add(key)
+        result.append(query[:100])
+        if len(result) >= 4:
+            break
+    return result or [f"{topic} exercise demonstration"]
+
+
+def download_clips(terms):
+    """Search by topic-specific terms, interleave query results, and reject tagged mismatches."""
+    queries = parse_list(terms)[:4]
+    if not queries:
+        raise RuntimeError("No topic-specific stock footage search terms were generated.")
+    groups = []
+    for query in queries:
+        group = []
+        for provider in (pexels, pixabay):
+            try:
+                group.extend(provider(query))
+            except Exception as exc:
+                print(f"WARNING: stock search error for '{query}': {exc}")
+        # Preserve provider ranking; deduplicate within each query group.
+        seen_urls = set()
+        group = [item for item in group if item.get("url") and not (
+            item["url"] in seen_urls or seen_urls.add(item["url"])
+        )]
+        groups.append(group)
+
+    # Round-robin query results so the montage can cover different aspects of the same topic.
+    all_clips = []
+    max_items = max((len(group) for group in groups), default=0)
+    for index in range(max_items):
+        for group in groups:
+            if index < len(group):
+                all_clips.append(group[index])
+
+    used, paths, credits = set(), [], []
+    for clip in all_clips:
+        if clip["url"] in used:
+            continue
+        tags = " ".join(clip.get("tags", [])).lower()
+        query_words = {w.replace("-", "") for w in re.findall(r"[a-z0-9-]+", clip.get("query", "").lower()) if len(w) > 2}
+        tag_words = {w.replace("-", "") for w in re.findall(r"[a-z0-9-]+", tags) if len(w) > 2}
+        if tag_words and query_words and not (query_words & tag_words):
+            print(f"INFO: rejecting low-relevance Pixabay clip for query '{clip.get('query', '')}'.")
+            continue
+        used.add(clip["url"])
+        path = TMP / f"clip_{len(paths)+1}.mp4"
         try:
-            with requests.get(clip["url"],stream=True,timeout=90) as r:
-                r.raise_for_status()
-                with path.open("wb") as f:
-                    for chunk in r.iter_content(512*1024):
-                        if chunk: f.write(chunk)
-            run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(path)])
-            paths.append(path); credits.append(f"- {clip['credit']}: {clip['page']}")
-            if len(paths)>=5: break
-        except Exception as e:
-            path.unlink(missing_ok=True); print(f"WARNING: skipping invalid stock clip: {e}")
-    if not paths: raise RuntimeError("No stock clips downloaded. Add PEXELS_API_KEY and/or PIXABAY_API_KEY as secrets.")
-    return paths,credits
+            with requests.get(clip["url"], stream=True, timeout=90) as response:
+                response.raise_for_status()
+                with path.open("wb") as file_obj:
+                    for chunk in response.iter_content(512 * 1024):
+                        if chunk:
+                            file_obj.write(chunk)
+            probe = run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                         "-of", "default=noprint_wrappers=1:nokey=1", str(path)])
+            if float(probe.stdout.strip() or 0) < 0.5:
+                raise RuntimeError("stock clip is shorter than 0.5 seconds")
+            paths.append(path)
+            credits.append(f"- {clip['credit']}: {clip['page']}")
+            print(f"Selected footage for '{clip.get('query', 'topic')}': {clip['page']}")
+            if len(paths) >= 5:
+                break
+        except Exception as exc:
+            path.unlink(missing_ok=True)
+            print(f"WARNING: skipping invalid stock clip: {exc}")
+    if not paths:
+        raise RuntimeError("No relevant stock clips downloaded. Add PEXELS_API_KEY and/or PIXABAY_API_KEY, then review the search terms.")
+    return paths, credits
 
 async def make_voice(script):
     path=TMP/"voice.mp3"
@@ -423,7 +476,9 @@ def upload(path,data,credits,thumbnail_path=None):
 def main():
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"): raise RuntimeError("Install FFmpeg and ensure ffmpeg/ffprobe are on PATH")
     data=topic_data(); print("Title:",data["title"]); print("Script:",data["script"])
-    clips,credits=download_clips(data.get("search_terms",["fitness workout gym"]))
+    queries=footage_queries(data)
+    print("Topic-specific footage queries:", " | ".join(queries))
+    clips,credits=download_clips(queries)
     audio=asyncio.run(make_voice(data["script"]))
     video=make_video(clips,audio,data["script"])
     quality=validate_video(video, SECONDS)
