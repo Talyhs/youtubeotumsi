@@ -1,57 +1,59 @@
-# youtube_fitnes_talyhs — English Fitness Shorts
+# youtube_fitnes_talyhs — Türkçe Fitness Shorts Otomasyonu
 
-This project generates English-language fitness Shorts (30–60 seconds) using stock footage, neural voice, subtitles, and optional YouTube upload.
+Bu klasör, ana YouTube otomasyonundan ayrı ayarlarla ikinci YouTube kanalına yönelik 30–60 saniyelik Türkçe fitness Shorts videoları üretir.
 
-## Features
-- Vertical 1080×1920 MP4, default 45 seconds
-- English script generation with Gemini when configured; safe built-in fallback script otherwise
-- Stock footage search/download from Pexels and Pixabay
-- Neural English narration using `edge-tts` (`en-US-GuyNeural` by default)
-- FFmpeg montage, burned-in subtitles, MP4 output
-- SEO title, description, hashtags, and stock source credits
-- YouTube OAuth upload with target channel verification before upload
-- Default `prepare` mode; public upload requires explicit repository variable
+## Yapılandırılan özellikler
+- 1080×1920 dikey MP4 video, varsayılan 45 saniye
+- Türkçe fitness senaryosu (Gemini API yoksa yerleşik yedek metin)
+- Pexels ve Pixabay stok video araması/indirmesi
+- Edge TTS Türkçe kadın sesi: `tr-TR-EmelNeural` (değiştirilebilir)
+- FFmpeg montajı ve videoya gömülü altyazılar
+- Başlık, açıklama, hashtag ve stok kaynak kredileri
+- Yüklemeden önce OAuth hesabında doğru kanal ID'sini doğrulama
+- Zamanlanmış görevlerde yalnızca `prepare`; otomatik herkese açık yayın yok
 
-## GitHub setup
-Add repository **Secrets** under Settings → Secrets and variables → Actions:
-- `PEXELS_API_KEY` — recommended
-- `PIXABAY_API_KEY` — recommended
-- `GEMINI_API_KEY` — optional, for generated scripts
-- `TOKEN_JSON` — complete OAuth authorized-user token JSON; never commit this file
+## GitHub Actions
+İş akışı: [Turkish Fitness Shorts Bot](../.github/workflows/fitness-shorts.yml)
 
-Add repository **Variables**:
-- `YOUTUBE_CHANNEL_ID` — exact channel ID that the OAuth credentials should access
-- `ALLOW_PUBLIC_UPLOAD` — keep unset/`NO` until the generated video and OAuth channel are tested; set to `YES` only when ready for public uploads
+Türkiye saatiyle (UTC+3) her gün üç video hazırlama denemesi: **07:30, 12:00 ve 18:30**. GitHub zamanlanmış görevleri gecikebilir. Videolar Actions run sayfasındaki `youtube-fitness-shorts` artifact ZIP dosyasında saxlanır.
 
-The OAuth token must include both scopes:
+## GitHub Secrets
+Repo → **Settings → Secrets and variables → Actions → Secrets** bölümüne ekle:
+- `PEXELS_API_KEY`
+- `PIXABAY_API_KEY`
+- `GEMINI_API_KEY` (isteğe bağlı)
+- `FITNESS_TOKEN_JSON` (ikinci kanal OAuth token JSON-u; kod deposuna qoyma)
+
+Token aşağıdakı OAuth scope-larını ehtiva etməlidir:
 - `https://www.googleapis.com/auth/youtube.upload`
 - `https://www.googleapis.com/auth/youtube.readonly`
 
-## First run
-1. Push this folder to a new GitHub repository named `youtube_fitnes_talyhs`.
-2. Add the secrets and channel variable above.
-3. Open Actions → English Fitness Shorts Bot → Run workflow.
-4. Choose `prepare`. Download the `youtube-fitness-shorts` artifact and inspect the MP4, voice, subtitles, and credits.
-5. Only after testing, set `ALLOW_PUBLIC_UPLOAD=YES` and manually run with `upload`.
+## GitHub Variables
+**Settings → Secrets and variables → Actions → Variables** bölməsinə əlavə et:
+- `FITNESS_YOUTUBE_CHANNEL_ID` = `UC7_pFbnnuMWT_US47_FD6MDA`
+- `FITNESS_ALLOW_PUBLIC_UPLOAD` = əvvəlcə `NO`; yalnız testdən sonra `YES`
+- `EDGE_TTS_VOICE` = `tr-TR-EmelNeural` (qadın səsi; kişi üçün `tr-TR-AhmetNeural`)
+- `GEMINI_MODEL` = `gemini-2.5-flash`
 
-The scheduled run is intentionally `prepare` only. It does not auto-publish publicly. The cron is 16:00 UTC (20:00 in Azerbaijan during UTC+4), but schedule timing can be delayed by GitHub Actions.
+## İlk sınaq
+1. API açarlarını və Variables dəyərlərini əlavə et.
+2. GitHub → **Actions → Turkish Fitness Shorts Bot → Run workflow** aç.
+3. İlk dəfə `prepare` seç və **Run workflow** bas.
+4. Run bitəndə **Artifacts → youtube-fitness-shorts** ZIP faylını endir; videonu, səsi, altyazıları və kreditləri yoxla.
+5. OAuth tokeninin ikinci kanala aid olduğunu təsdiqlə. Kod kanal ID-si uyğun gəlmirsə yükləməni bloklayır.
+6. Yalnız bütün testlər keçəndən sonra `FITNESS_ALLOW_PUBLIC_UPLOAD=YES` et və əl ilə `upload` seç.
 
-## Local Windows setup
-Install Python 3.11+ and FFmpeg, then in PowerShell:
+## Lokal Windows quraşdırılması
+Python 3.11+ və FFmpeg quraşdırıldıqdan sonra PowerShell-də:
 ```powershell
+cd youtube_fitnes_talyhs
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-$env:PEXELS_API_KEY = "your-key"
-$env:PIXABAY_API_KEY = "your-key"
-$env:GEMINI_API_KEY = "your-key" # optional
+$env:PEXELS_API_KEY = "API_AÇARIN"
+$env:PIXABAY_API_KEY = "API_AÇARIN"
 $env:PUBLISH_MODE = "prepare"
 python youtube.py
 ```
-Do not paste real keys into source files or commit them to GitHub. For upload, also set `TOKEN_JSON`, `YOUTUBE_CHANNEL_ID`, and `ALLOW_PUBLIC_UPLOAD=YES` only after checking the channel and OAuth scopes.
 
-## Important
-- Check the current Pexels/Pixabay license and API terms for every clip; adding credits does not override license restrictions.
-- Review fitness claims before publishing. This is general education, not medical advice.
-- `edge-tts` availability/voice options may change. If the chosen voice is unavailable, change `EDGE_TTS_VOICE` to another supported English voice.
-- This is a starter implementation; validate generated videos and OAuth setup before enabling public uploads.
+Heç bir real API açarını və ya OAuth tokenini kodda saxlama və GitHub-a yükləmə. Stok kliplərin lisenziyasını və fitness məlumatlarının düzgünlüyünü yayımdan əvvəl yoxla. Bu, ümumi maarifləndirici məzmundur, tibbi məsləhət deyil.
