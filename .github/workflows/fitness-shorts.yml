@@ -1,0 +1,77 @@
+name: Turkish Fitness Shorts Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "prepare = create video only; upload = upload to the verified second channel"
+        type: choice
+        required: true
+        default: prepare
+        options:
+          - prepare
+          - upload
+  schedule:
+    # Turkey time (UTC+3): 07:30, 12:00, 18:30. Scheduled runs only prepare videos.
+    - cron: "30 4 * * *"
+    - cron: "0 9 * * *"
+    - cron: "30 15 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youtube-fitness-shorts
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PUBLISH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'prepare' }}
+      VIDEO_SECONDS: "45"
+      EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE || 'tr-TR-EmelNeural' }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      TOKEN_JSON: ${{ secrets.FITNESS_TOKEN_JSON }}
+      YOUTUBE_CHANNEL_ID: ${{ vars.FITNESS_YOUTUBE_CHANNEL_ID }}
+      ALLOW_PUBLIC_UPLOAD: ${{ vars.FITNESS_ALLOW_PUBLIC_UPLOAD || 'NO' }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: youtube_fitnes_talyhs/requirements.txt
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install Python dependencies
+        working-directory: youtube_fitnes_talyhs
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Validate configuration
+        shell: bash
+        run: |
+          if [[ -z "$PEXELS_API_KEY" && -z "$PIXABAY_API_KEY" ]]; then
+            echo "Missing stock video API key. Add PEXELS_API_KEY or PIXABAY_API_KEY to repository Secrets."
+            exit 1
+          fi
+          if [[ "$PUBLISH_MODE" == "upload" ]]; then
+            [[ -n "$TOKEN_JSON" ]] || { echo "Missing FITNESS_TOKEN_JSON secret"; exit 1; }
+            [[ -n "$YOUTUBE_CHANNEL_ID" ]] || { echo "Missing FITNESS_YOUTUBE_CHANNEL_ID variable"; exit 1; }
+            [[ "$ALLOW_PUBLIC_UPLOAD" == "YES" ]] || { echo "Upload blocked. Set FITNESS_ALLOW_PUBLIC_UPLOAD=YES only after testing."; exit 1; }
+          fi
+      - name: Generate fitness Short
+        working-directory: youtube_fitnes_talyhs
+        run: python youtube.py
+      - name: Save generated files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-fitness-shorts
+          path: youtube_fitnes_talyhs/output/
+          if-no-files-found: warn
+          retention-days: 7
