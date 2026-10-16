@@ -93,7 +93,7 @@ jobs:
       FITNESS_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
       VIDEO_SECONDS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration || '45' }}
       EDGE_TTS_VOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.voice == 'male' && 'tr-TR-AhmetNeural' || github.event_name == 'workflow_dispatch' && inputs.voice == 'female' && 'tr-TR-EmelNeural' || vars.EDGE_TTS_VOICE || 'tr-TR-EmelNeural' }}
-      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
