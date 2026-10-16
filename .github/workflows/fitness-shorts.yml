@@ -40,6 +40,11 @@ on:
           - female
           - male
           - auto
+      confirm_upload:
+        description: "Explicitly approve publishing this run (required when mode=upload)"
+        type: boolean
+        required: true
+        default: false
       whisper:
         description: "Use Whisper for word-level subtitle timing (slower first run)"
         type: choice
@@ -95,6 +100,7 @@ jobs:
       TOKEN_JSON: ${{ secrets.FITNESS_TOKEN_JSON }}
       YOUTUBE_CHANNEL_ID: ${{ vars.FITNESS_YOUTUBE_CHANNEL_ID }}
       ALLOW_PUBLIC_UPLOAD: ${{ vars.FITNESS_ALLOW_PUBLIC_UPLOAD || 'NO' }}
+      CONFIRM_UPLOAD: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_upload == true && 'YES' || 'NO' }}
       USE_WHISPER_CAPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.whisper == 'yes' && 'YES' || vars.USE_WHISPER_CAPTIONS || 'NO' }}
 
     steps:
@@ -123,6 +129,7 @@ jobs:
           if [[ "$PUBLISH_MODE" == "upload" ]]; then
             [[ -n "$TOKEN_JSON" ]] || { echo "Missing FITNESS_TOKEN_JSON secret"; exit 1; }
             [[ -n "$YOUTUBE_CHANNEL_ID" ]] || { echo "Missing FITNESS_YOUTUBE_CHANNEL_ID variable"; exit 1; }
+            [[ "$CONFIRM_UPLOAD" == "YES" ]] || { echo "Upload blocked. Tick confirm_upload only after reviewing the generated video."; exit 1; }
             [[ "$ALLOW_PUBLIC_UPLOAD" == "YES" ]] || { echo "Upload blocked. Set FITNESS_ALLOW_PUBLIC_UPLOAD=YES only after testing."; exit 1; }
           fi
       - name: Generate fitness Short
