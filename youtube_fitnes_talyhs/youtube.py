@@ -52,27 +52,119 @@ def gen_json(prompt: str):
         print(f"WARNING: AI script generation unavailable; using fallback. {e}")
         return None
 
+def script_word_count(text):
+    """Count spoken words for duration-aware narration checks."""
+    return len(re.findall(r"\b[\w]+(?:['’-][\w]+)*\b", str(text)))
+
+
+def target_word_range(seconds):
+    """Comfortable narration pace for a 30, 45, or 60 second Short."""
+    if seconds <= 30:
+        return 52, 72
+    if seconds <= 45:
+        return 82, 105
+    return 112, 135
+
+
+def fallback_script(topic):
+    """Readable, safety-conscious fallback with length matched to the selected duration."""
+    sentences = [
+        f"Today, we're focusing on {topic}.",
+        "Start at a comfortable pace and choose movements you can control.",
+        "Keep your posture steady, move smoothly, and breathe throughout each repetition.",
+        "Before you begin, warm up with a few easy movements.",
+        "If your form starts to slip, slow down or take a short break.",
+        "You do not need maximum intensity to build a consistent exercise habit.",
+        "Choose movements that suit your current fitness level and available space.",
+        "Stop if you feel sharp pain, dizziness, or unusual discomfort.",
+        "Give your body time to recover, drink water, and get enough sleep.",
+        "Steady practice over time is more useful than one extremely hard workout.",
+        "Focus on controlled technique instead of rushing through each repetition.",
+        "Try this tip in your next session, and follow for more practical fitness advice.",
+    ]
+    target = round(SECONDS * 2.0)
+    chosen = []
+    for sentence in sentences:
+        chosen.append(sentence)
+        if script_word_count(" ".join(chosen)) >= target:
+            break
+    return " ".join(chosen)
+
+
 def topic_data():
     title, topic = IDEAS[int(time.time() // 14400) % len(IDEAS)]
     if REQUESTED_TOPIC:
         title = REQUESTED_TOPIC[:90]
         topic = REQUESTED_TOPIC[:180]
-    data = gen_json(
-        "Write an original English YouTube Fitness Shorts script. Return valid JSON with keys "
-        "title, topic, script, search_terms (array), description, hashtags (array). "
-        f"Topic: {topic}. Duration: {SECONDS} seconds. Natural spoken American English, a strong hook in the first 2 seconds, "
-        "short sentences, safe general fitness education, and a brief call to action. No medical claims, "
-        "guaranteed results, or dangerous advice. Write about 90–120 English words."
+
+    min_words, max_words = target_word_range(SECONDS)
+    target_words = round((min_words + max_words) / 2)
+    prompt = (
+        "Act as an experienced American English fitness scriptwriter and meticulous copy editor. "
+        "Create one original YouTube Fitness Short and return ONLY valid JSON with these keys: "
+        "title, topic, script, search_terms (array of 3-5 strings), description, hashtags (array). "
+        f"Subject: {topic}. Runtime: {SECONDS} seconds. The spoken script MUST contain {min_words}-{max_words} words "
+        f"(aim for about {target_words}); this limit is important because the voice-over must fit the video. "
+        "Write fluent, natural, idiomatic US English with correct grammar, spelling, punctuation, and clear pronunciation. "
+        "Read the script aloud mentally and rewrite any stiff, translated-sounding, repetitive, or awkward sentence. "
+        "Use contractions where natural, varied sentence openings, short speakable sentences, and a compelling hook in the first line. "
+        "Structure: hook, one clear practical tip, a brief actionable explanation, sensible safety note when relevant, and a natural CTA. "
+        "The script must contain ONLY words the narrator should speak: no headings, stage directions, emojis, or bullet points. "
+        "Make every tip specific to the subject; never invent statistics, promise results, shame bodies, or give medical advice. "
+        "Keep claims realistic and beginner-friendly. The title must be concise, accurate, and clickable without clickbait. "
+        "The description should be natural English and summarize the actual video. "
+        "Search terms must describe relevant real footage for this exact subject, not generic unrelated gym clips. "
+        "Return clean JSON only; do not include markdown fences or commentary."
     )
-    if data and all(k in data for k in ("title", "script", "search_terms")):
-        data.setdefault("topic", topic); data.setdefault("description", "Beginner-friendly general fitness tips.")
-        data.setdefault("hashtags", ["#fitness", "#shorts", "#workout"])
+    data = gen_json(prompt)
+
+    def valid_payload(item):
+        return (
+            isinstance(item, dict)
+            and all(k in item for k in ("title", "script", "search_terms"))
+            and isinstance(item.get("title"), str) and bool(item["title"].strip())
+            and isinstance(item.get("script"), str) and bool(item["script"].strip())
+        )
+
+    if valid_payload(data):
+        count = script_word_count(data["script"])
+        if not min_words <= count <= max_words:
+            print(f"INFO: Revising narration length ({count} words; target {min_words}-{max_words}).")
+            revised = gen_json(
+                "Rewrite this fitness Short script in polished, natural American English. "
+                f"The final spoken script must contain {min_words}-{max_words} words, with no headings or stage directions. "
+                "Preserve accurate, safe advice and the same topic. Return the same JSON keys only. "
+                f"JSON to revise: {json.dumps(data, ensure_ascii=False)}"
+            )
+            if valid_payload(revised) and min_words <= script_word_count(revised["script"]) <= max_words:
+                data = revised
+            else:
+                data = None
+
+    if valid_payload(data) and min_words <= script_word_count(data["script"]) <= max_words:
+        data["title"] = data["title"].strip()[:90]
+        data["topic"] = str(data.get("topic") or topic).strip()[:180]
+        data["script"] = data["script"].strip()
+        data["description"] = str(data.get("description") or "Beginner-friendly fitness tips.").strip()
+        if not isinstance(data.get("search_terms"), list):
+            data["search_terms"] = [str(data["search_terms"])]
+        data["search_terms"] = [str(x).strip() for x in data["search_terms"] if str(x).strip()][:5]
+        if not data["search_terms"]:
+            data["search_terms"] = [f"{topic} exercise demonstration"]
+        if not isinstance(data.get("hashtags"), list):
+            data["hashtags"] = ["#fitness", "#shorts", "#workout"]
+        data["hashtags"] = [str(x).strip() for x in data["hashtags"] if str(x).strip()][:8]
+        if not data["hashtags"]:
+            data["hashtags"] = ["#fitness", "#shorts", "#workout"]
+        print(f"English script quality gate: {script_word_count(data['script'])} words; target {min_words}-{max_words}.")
         return data
+
+    print("WARNING: AI script was unavailable or failed the duration/quality checks; using the reviewed English fallback.")
     return {
         "title": title, "topic": topic,
-        "script": f"Today's fitness focus is {topic}. Start with a comfortable pace and choose movements that match your current ability. Warm up with a few easy movements before training, keep your technique controlled, and breathe naturally. If an exercise feels too difficult, choose an easier variation rather than forcing it. Stop if you feel sharp pain. Consistency matters more than trying to do everything in one day. Save this video and take one positive step for your fitness today!",
-        "search_terms": [f"{topic} fitness exercise demonstration", "fitness exercise technique demonstration"],
-        "description": "Beginner-friendly fitness tips. Adapt exercises to your ability and stop if you feel pain.",
+        "script": fallback_script(topic),
+        "search_terms": [f"{topic} exercise demonstration", f"{topic} proper technique", "beginner fitness exercise form"],
+        "description": f"Practical, beginner-friendly advice about {topic}. Choose movements that suit your ability and stop if you feel pain.",
         "hashtags": ["#fitness", "#shorts", "#workout", "#exercise"]
     }
 
