@@ -58,7 +58,13 @@ HEADERS = {"User-Agent": "TalyhsYouTubeAutomation/1.0"}
 
 def topic_video_filename(topic):
     """Create a filesystem-safe, topic-based MP4 filename."""
-    normalized = unicodedata.normalize("NFKD", topic)
+    translation = str.maketrans({
+        "ı": "i", "İ": "I", "ş": "s", "Ş": "S",
+        "ç": "c", "Ç": "C", "ğ": "g", "Ğ": "G",
+        "ö": "o", "Ö": "O", "ü": "u", "Ü": "U",
+    })
+    normalized = topic.translate(translation)
+    normalized = unicodedata.normalize("NFKD", normalized)
     normalized = normalized.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^A-Za-z0-9]+", "_", normalized).strip("_").lower()
     slug = slug[:100].strip("_") or "youtube_video"
