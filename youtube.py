@@ -2,7 +2,9 @@
 import json
 import os
 import re
+import shutil
 import subprocess
+import unicodedata
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -53,6 +55,26 @@ if PRIVACY not in {"public", "private", "unlisted"}:
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 YOUTUBE_CATEGORY = "27"
 HEADERS = {"User-Agent": "TalyhsYouTubeAutomation/1.0"}
+
+def topic_video_filename(topic):
+    """Create a filesystem-safe, topic-based MP4 filename."""
+    normalized = unicodedata.normalize("NFKD", topic)
+    normalized = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", normalized).strip("_").lower()
+    slug = slug[:100].strip("_") or "youtube_video"
+    return f"{slug}.mp4"
+
+
+def save_topic_named_video():
+    """Keep the stable pipeline filename and also save a descriptive copy."""
+    output_dir = BASE / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    topic_file = output_dir / topic_video_filename(TOPIC)
+    shutil.copy2(VIDEO_FILE, topic_file)
+    print("Topic-named video saved:", topic_file)
+    return topic_file
+
+
 TIMEOUT = 60
 
 # Turkish-language topic rotation; English queries are only for finding relevant stock footage.
@@ -1503,6 +1525,7 @@ def main():
     duration = create_voice_and_subtitles(script)
     make_video(clips, duration)
     validate_final_video(duration)
+    save_topic_named_video()
     if CREATE_THUMBNAIL:
         create_thumbnail(title)
     if PUBLISH_MODE == "upload":
