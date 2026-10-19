@@ -181,12 +181,15 @@ elif page=="Video istehsalı":
             custom_fitness_topic = st.text_input("Öz mövzun (istəyə görə)", placeholder="e.g. 3 beginner mistakes in push-ups") if selected_fitness_topic == "Custom topic…" else ""
             topic = custom_fitness_topic.strip() if selected_fitness_topic == "Custom topic…" else selected_fitness_topic
         else:
-            topic=st.text_input("Mövzu",placeholder="Fironların gizli tarixi")
+            topic_options=["Telefon Nasıl İcat Edildi?","Firavunlar: Antik Mısır'ın Gizemleri","İnsan Beyni Hakkında İlginç Gerçekler","Özel konu yaz…"]
+            selected_topic=st.selectbox("Hazır mövzu",topic_options,index=0)
+            custom_topic=st.text_input("Öz mövzun",placeholder="Türk dilində mövzu daxil et") if selected_topic=="Özel konu yaz…" else ""
+            topic=custom_topic.strip() if selected_topic=="Özel konu yaz…" else selected_topic
         a,b,c=st.columns(3)
         if ACTIVE_CHANNEL["kind"] == "fitness":
             lang=a.selectbox("Dil",["English"],0);dur=b.selectbox("Müddət",["30 saniyə","45 saniyə","1 dəqiqə"],1);fmt=c.selectbox("Format",["Shorts · 9:16"])
         else:
-            lang=a.selectbox("Dil",list(LANG),0);dur=b.selectbox("Müddət",list(DUR),1);fmt=c.selectbox("Format",["Shorts · 9:16","Standart · 16:9"])
+            lang=a.selectbox("Dil",list(LANG),2);dur=b.selectbox("Müddət",list(DUR),1);fmt=c.selectbox("Format",["Shorts · 9:16","Standart · 16:9"])
         if ACTIVE_CHANNEL["kind"] == "fitness":
             a,b=st.columns(2)
             voice_options = ["female","male","auto"]
