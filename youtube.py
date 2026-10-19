@@ -327,6 +327,27 @@ def generate_script(topic):
     is_turkish_brain_short = LANGUAGE == "tr" and 30 <= target_seconds <= 60 and any(
         word in topic_lower for word in ("beyin", "brain", "beyniniz", "beynimiz")
     )
+    topic_compact = re.sub(r"[^a-z0-9ıişğüöç]", "", topic_lower)
+    is_turkish_phone_topic = LANGUAGE == "tr" and any(
+        term in topic_compact for term in (
+            "telefon", "telfon", "telofon", "telephone", "telefonunicat",
+            "telefonnasılicat", "telefonnasilicat", "icat edildi", "icat edildi"
+        )
+    )
+    turkish_phone_fallback = (
+        "Bugün cebimizde taşıdığımız telefonun hikâyesi, aslında çok daha eskiye dayanıyor! "
+        "1870’lerde insanlar uzaktaki biriyle konuşmak için telgraf kullanıyordu. "
+        "Mucitler, insan sesini elektrik sinyalleriyle kablo üzerinden iletmenin yollarını aradı. "
+        "Alexander Graham Bell, 1876’da telefon için önemli bir patent aldı ve aynı yıl "
+        "başarılı ses iletimi deneyleriyle tanındı. Ancak telefonun gelişiminde Antonio Meucci "
+        "gibi başka mucitlerin de önemli katkıları vardı; bu yüzden icadın tarihi tek bir kişiden "
+        "ibaret değil. İlk telefonlar bugünkü gibi küçük ve kablosuz değildi: konuşmak için "
+        "cihazın başında durmak ve kabloya bağlı olmak gerekiyordu. Zamanla santraller, "
+        "otomatik arama, cep telefonları ve sonunda akıllı telefonlar ortaya çıktı. "
+        "Yani telefon, basit bir ses iletme fikrinden dünyanın her yerine bağlandığımız "
+        "küçük bir bilgisayara dönüştü. Sence telefondaki en büyük devrim hangisiydi: "
+        "kablosuz arama mı, yoksa internetin telefona gelmesi mi?"
+    )
     turkish_brain_short_fallback = (
         "Beyniniz hakkında sizi şaşırtacak üç gerçek! Birincisi, beynin kendi dokusunda "
         "ağrı reseptörleri bulunmaz. Baş ağrısı genellikle beynin çevresindeki yapılardan "
@@ -375,6 +396,10 @@ Return only the narration, without markdown, title, URL or stage directions.
         if LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
             script = load_pharaohs_fallback_script()
             fallback_used = True
+        elif is_turkish_phone_topic:
+            script = turkish_phone_fallback
+            fallback_used = True
+            print("WARNING: Gemini unavailable; using built-in Turkish phone-invention fallback script.")
         elif is_turkish_brain_short:
             script = turkish_brain_short_fallback
             fallback_used = True
