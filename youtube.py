@@ -407,6 +407,22 @@ Return only the narration, without markdown, title, URL or stage directions.
         elif is_brain_short:
             script = brain_short_fallback
             print("WARNING: Gemini əlçatan deyil; beyin mövzusu üçün daxili 50 saniyəlik Azərbaycan ssenarisi istifadə olunur.")
+        elif LANGUAGE == "tr" and 30 <= target_seconds <= 60:
+            # Keep Shorts preparation running during temporary Gemini outages.
+            script = (
+                f"{topic} hakkında çoğu kişinin bilmediği bir ayrıntı var. "
+                "Günlük hayatta kullandığımız şeylerin arkasında çoğu zaman uzun bir deneme, "
+                "yanılma ve keşif hikâyesi bulunur. Önce küçük bir ihtiyaç ortaya çıkar; "
+                "ardından insanlar daha pratik, güvenli ya da hızlı bir çözüm arar. "
+                "İlk örnekler genellikle bugünkü kadar kullanışlı değildir. Zamanla yeni "
+                "malzemeler, üretim yöntemleri ve farklı fikirler geliştirilir; böylece "
+                "basit görünen bir eşya günlük yaşamın vazgeçilmez parçasına dönüşür. "
+                "Bu yüzden sıradan bir nesneye baktığımızda yalnızca kendisini değil, "
+                "onu geliştiren insanların yaratıcılığını da görürüz. "
+                "Sence günlük hayatta kullandığımız hangi eşyanın hikâyesi en şaşırtıcı?"
+            )
+            fallback_used = True
+            print("WARNING: Gemini unavailable; using built-in Turkish Shorts fallback script.")
         elif LANGUAGE == "az" and 150 <= target_seconds <= 220:
             script = load_fallback_script()
             global TOPIC
@@ -447,8 +463,7 @@ Return only the narration, without markdown, title, URL or stage directions.
                 print(f"Correction unavailable, using built-in brain Shorts fallback: {exc}")
                 script = brain_short_fallback
                 word_count = count_script_words(script)
-            elif LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
-                print(f"Correction unavailable; using Turkish pharaohs fallback: {exc}")
+            elif LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:                print(f"Correction unavailable; using Turkish pharaohs fallback: {exc}")
                 script = load_pharaohs_fallback_script()
                 word_count = count_script_words(script)
                 fallback_used = True
@@ -897,8 +912,7 @@ def create_voice_and_subtitles(script):
             print(f"4. Kokoro ONNX ilə pulsuz yerli AI səsləndirmə hazırlanır ({KOKORO_VOICE})...")
             wav_file = WORK / "voiceover_kokoro.wav"
             tts = Kokoro(str(model_path), str(voices_path))
-            try:
-                samples, sample_rate = tts.create(
+            try:                samples, sample_rate = tts.create(
                     script,
                     voice=KOKORO_VOICE,
                     speed=float(os.getenv("KOKORO_SPEED", "1.0")),
@@ -1347,8 +1361,7 @@ def create_thumbnail(title):
                 raise RuntimeError(
                     "AUTOMATIC1111 thumbnail generation failed and SD_WEBUI_REQUIRED=true. "
                     "Check SD_WEBUI_URL, API access, credentials, model and available VRAM. "
-                    f"Original error: {exc}"
-                ) from exc
+                    f"Original error: {exc}"                ) from exc
             print(f"WARNING: AUTOMATIC1111 unavailable; using branded Pillow fallback: {exc}")
 
     if image is None:
