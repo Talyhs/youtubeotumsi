@@ -463,7 +463,8 @@ Return only the narration, without markdown, title, URL or stage directions.
                 print(f"Correction unavailable, using built-in brain Shorts fallback: {exc}")
                 script = brain_short_fallback
                 word_count = count_script_words(script)
-            elif LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:                print(f"Correction unavailable; using Turkish pharaohs fallback: {exc}")
+            elif LANGUAGE == "tr" and is_pharaohs_topic(topic) and target_seconds >= 300:
+                print(f"Correction unavailable; using Turkish pharaohs fallback: {exc}")
                 script = load_pharaohs_fallback_script()
                 word_count = count_script_words(script)
                 fallback_used = True
