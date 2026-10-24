@@ -913,7 +913,8 @@ def create_voice_and_subtitles(script):
             print(f"4. Kokoro ONNX ilə pulsuz yerli AI səsləndirmə hazırlanır ({KOKORO_VOICE})...")
             wav_file = WORK / "voiceover_kokoro.wav"
             tts = Kokoro(str(model_path), str(voices_path))
-            try:                samples, sample_rate = tts.create(
+            try:
+                samples, sample_rate = tts.create(
                     script,
                     voice=KOKORO_VOICE,
                     speed=float(os.getenv("KOKORO_SPEED", "1.0")),
